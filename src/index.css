@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: #111312;
+    background-color: #f5f6f3;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  .font-mono, .tabular-nums {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Signature DisputeFox-inspired surface & hatched bar styles */
+.mint-spotlight-panel {
+  background: linear-gradient(155deg, #e8f5ec 0%, #eff8e7 52%, #f7faf4 100%);
+}
+
+.spectrum-hatch-bar {
+  background-image:
+    repeating-linear-gradient(
+      -55deg,
+      rgba(255, 255, 255, 0.34) 0px,
+      rgba(255, 255, 255, 0.34) 2px,
+      transparent 2px,
+      transparent 5px
+    ),
+    linear-gradient(90deg, #f06449 0%, #f7d348 48%, #98f64f 100%);
+}
+
+.lime-hatch-bar {
+  background-image:
+    repeating-linear-gradient(
+      -55deg,
+      rgba(255, 255, 255, 0.35) 0px,
+      rgba(255, 255, 255, 0.35) 2px,
+      transparent 2px,
+      transparent 5px
+    ),
+    linear-gradient(90deg, #8ce638 0%, #98f64f 100%);
+}

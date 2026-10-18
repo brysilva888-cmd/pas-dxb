@@ -1,0 +1,109 @@
+{
+  "entities": {
+    "TournamentSession": {
+      "title": "TournamentSession",
+      "description": "Shared real-time pickleball open-play tournament session containing court configuration, active round state, player roster map, and scheduled rounds map.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Display name of the open-play session.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "visibility": {
+          "type": "string",
+          "description": "Access mode for the session.",
+          "enum": ["shared", "private"],
+          "maxLength": 20
+        },
+        "courtCount": {
+          "type": "integer",
+          "description": "Number of active courts (1 to 16)."
+        },
+        "menCourtsPhase1": {
+          "type": "integer",
+          "description": "Number of Men's Doubles courts in Phase 1 (0 to 16)."
+        },
+        "genderGamesTarget": {
+          "type": "integer",
+          "description": "Target Gender Doubles games per player (default 4)."
+        },
+        "mixedGamesTarget": {
+          "type": "integer",
+          "description": "Target Mixed Doubles games per player (default 1)."
+        },
+        "activeRoundNumber": {
+          "type": "integer",
+          "description": "Currently active round number (1 to 50)."
+        },
+        "rosterMap": {
+          "type": "object",
+          "description": "Native Firestore map of players keyed by player ID (max 150 entries)."
+        },
+        "roundsMap": {
+          "type": "object",
+          "description": "Native Firestore map of rounds keyed by round number string (max 50 entries)."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the session creator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the session was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the session was last updated."
+        }
+      },
+      "required": [
+        "title",
+        "visibility",
+        "courtCount",
+        "menCourtsPhase1",
+        "genderGamesTarget",
+        "mixedGamesTarget",
+        "activeRoundNumber",
+        "rosterMap",
+        "roundsMap",
+        "ownerId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Read-only marker document identifying a system administrator by UID.",
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["admin"],
+          "maxLength": 16
+        }
+      },
+      "required": ["role"]
+    }
+  },
+  "firestore": {
+    "/sessions/{sessionId}": {
+      "schema": {
+        "$ref": "#/entities/TournamentSession"
+      },
+      "description": "Live pickleball open-play sessions synced across devices."
+    },
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "#/entities/AdminRecord"
+      },
+      "description": "Trusted administrator lookup collection."
+    }
+  }
+}

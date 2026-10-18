@@ -1,0 +1,151 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'brysilva888@gmail.com'
+      );
+    }
+
+    // Validation Blueprint for TournamentSession (synced with firebase-blueprint.json)
+    function isValidSession(data) {
+      return data.keys().hasAll([
+          'title',
+          'visibility',
+          'courtCount',
+          'menCourtsPhase1',
+          'genderGamesTarget',
+          'mixedGamesTarget',
+          'activeRoundNumber',
+          'rosterMap',
+          'roundsMap',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'title',
+          'visibility',
+          'courtCount',
+          'menCourtsPhase1',
+          'genderGamesTarget',
+          'mixedGamesTarget',
+          'activeRoundNumber',
+          'rosterMap',
+          'roundsMap',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.visibility is string && data.visibility.size() >= 1 && data.visibility.size() <= 20 &&
+        (data.visibility == 'shared' || data.visibility == 'private') &&
+        data.courtCount is int && data.courtCount >= 1 && data.courtCount <= 16 &&
+        data.menCourtsPhase1 is int && data.menCourtsPhase1 >= 0 && data.menCourtsPhase1 <= 16 &&
+        data.genderGamesTarget is int && data.genderGamesTarget >= 1 && data.genderGamesTarget <= 20 &&
+        data.mixedGamesTarget is int && data.mixedGamesTarget >= 0 && data.mixedGamesTarget <= 20 &&
+        data.activeRoundNumber is int && data.activeRoundNumber >= 1 && data.activeRoundNumber <= 50 &&
+        data.rosterMap is map && data.rosterMap.size() <= 150 &&
+        data.roundsMap is map && data.roundsMap.size() <= 50 &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Admins Collection (Read-only lookup, never client-writable)
+    match /admins/{adminId} {
+      allow get: if isVerifiedUser() && isValidId(adminId) && (request.auth.uid == adminId || isAdmin());
+      allow list, create, update, delete: if false;
+    }
+
+    // Tournament Sessions Collection
+    match /sessions/{sessionId} {
+      allow get: if isVerifiedUser() && isValidId(sessionId) && (
+        existing().ownerId == request.auth.uid ||
+        existing().visibility == 'shared' ||
+        isAdmin()
+      );
+
+      allow list: if false;
+
+      allow create: if isVerifiedUser() &&
+        isValidId(sessionId) &&
+        isValidSession(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(sessionId) &&
+        isValidSession(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          // Action 1: Owner or Admin full configuration & state update
+          ((existing().ownerId == request.auth.uid || isAdmin()) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title',
+              'visibility',
+              'courtCount',
+              'menCourtsPhase1',
+              'genderGamesTarget',
+              'mixedGamesTarget',
+              'activeRoundNumber',
+              'rosterMap',
+              'roundsMap',
+              'updatedAt'
+            ])
+          ) ||
+          // Action 2: Shared session live score / schedule / roster sync by verified participant
+          (existing().visibility == 'shared' &&
+            incoming().visibility == existing().visibility &&
+            incoming().title == existing().title &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'courtCount',
+              'menCourtsPhase1',
+              'genderGamesTarget',
+              'mixedGamesTarget',
+              'activeRoundNumber',
+              'rosterMap',
+              'roundsMap',
+              'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(sessionId) && (
+        existing().ownerId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+  }
+}

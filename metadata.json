@@ -1,0 +1,6 @@
+{
+  "name": "CourtFlow Pickleball Open Play",
+  "description": "Smart pickleball open play scheduler and court rotation manager for men's, women's, and mixed doubles with unique opponent matchmaking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,51 @@
+# CourtFlow Pickleball Open Play Roster (.txt)
+# List player names under Men: and Women: sections, or write "Name, M" / "Name, W" on each line.
+
+Men:
+Liam Carter
+Noah Bennett
+Oliver Hayes
+Elijah Brooks
+James Sullivan
+William Price
+Benjamin Reed
+Lucas Morgan
+Henry Cooper
+Theodore Ward
+Jack Torres
+Levi Peterson
+Alexander Gray
+Jackson Ramirez
+Mateo James
+Daniel Watson
+Michael Kelly
+Mason Sanders
+Sebastian Ross
+Ethan Henderson
+Logan Coleman
+Owen Jenkins
+Samuel Perry
+Jacob Powell
+Asher Long
+
+Women:
+Olivia Chen
+Emma Rodriguez
+Charlotte Kim
+Amelia Patel
+Sophia Nguyen
+Mia Kowalski
+Isabella Silva
+Ava Morales
+Evelyn Lindqvist
+Luna Novak
+Harper Vance
+Camila Reyes
+Sofia Rostova
+Scarlett Jensen
+Elizabeth Park
+Eleanor Sato
+Emily Costa
+Chloe Hoffman
+Mila Bernard
+Violet Gallagher
