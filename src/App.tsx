@@ -8,9 +8,13 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Crown,
+  Eye,
+  EyeOff,
   Link2,
   LogIn,
   LogOut,
@@ -90,6 +94,8 @@ export default function App() {
   // Round Timer State (12 minutes default open-play game timer)
   const [timerSeconds, setTimerSeconds] = useState<number>(12 * 60);
   const [timerRunning, setTimerRunning] = useState<boolean>(false);
+  const [showOverviewDashboard, setShowOverviewDashboard] =
+    useState<boolean>(true);
 
   // Firebase Auth & Real-Time Firestore Session Sync State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -1319,8 +1325,94 @@ export default function App() {
       </div>
 
       {/* Main Content Container (1440px max-width) */}
-      <main className="max-w-[1440px] w-full mx-auto px-6 py-6 flex-1 space-y-6">
+      <main className="max-w-[1440px] w-full mx-auto px-6 py-6 flex-1 space-y-5">
+        {/* Hide / Unhide Overview Dashboard Bar */}
+        <div className="bg-white border border-[#E6EAE4] rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#111312]">
+              <span className="w-2 h-2 rounded-full bg-[#98F64F]" />
+              <span>Overview &amp; Champions Dashboard</span>
+            </span>
+
+            {/* Compact summary pills shown when dashboard is hidden (or always for quick glance) */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="inline-flex items-center gap-1 bg-[#F5F6F3] border border-[#E6EAE4] rounded-lg px-2 py-1 font-mono font-semibold text-[#111312]">
+                <button
+                  type="button"
+                  disabled={activeRoundNumber <= 1}
+                  onClick={() => {
+                    setSelectedSwapPlayerId(null);
+                    setActiveRoundNumber((r) => Math.max(1, r - 1));
+                  }}
+                  className="hover:text-slate-600 disabled:opacity-30"
+                  title="Previous Round"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span>
+                  R{activeRoundNumber}/{rounds.length}
+                </span>
+                <button
+                  type="button"
+                  disabled={activeRoundNumber >= rounds.length}
+                  onClick={() => {
+                    setSelectedSwapPlayerId(null);
+                    setActiveRoundNumber((r) => Math.min(rounds.length, r + 1));
+                  }}
+                  className="hover:text-slate-600 disabled:opacity-30"
+                  title="Next Round"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <span className="px-2.5 py-1 rounded-lg bg-[#F5F6F3] border border-[#E6EAE4] font-semibold text-[#111312] whitespace-nowrap">
+                {activeCourtsInRound} Courts · {players.filter((p) => p.active).length} Players · {currentRound?.benchPlayerIds.length || 0} Bench
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setTimerRunning(!timerRunning)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#111312] text-white font-mono font-semibold whitespace-nowrap hover:bg-[#272B29] transition-colors"
+                title={timerRunning ? 'Pause Round Timer' : 'Start Round Timer'}
+              >
+                {timerRunning ? (
+                  <Pause className="w-3 h-3 text-[#98F64F]" />
+                ) : (
+                  <Play className="w-3 h-3 text-[#98F64F]" />
+                )}
+                <span>{formatTimer(timerSeconds)}</span>
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowOverviewDashboard((prev) => !prev)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+              showOverviewDashboard
+                ? 'bg-[#F5F6F3] hover:bg-[#EAECE6] text-[#111312] border border-[#E6EAE4]'
+                : 'bg-[#98F64F] hover:bg-[#88E63E] text-[#111312]'
+            }`}
+          >
+            {showOverviewDashboard ? (
+              <>
+                <EyeOff className="w-3.5 h-3.5" />
+                <span>Hide Overview</span>
+                <ChevronUp className="w-3.5 h-3.5" />
+              </>
+            ) : (
+              <>
+                <Eye className="w-3.5 h-3.5" />
+                <span>Unhide Overview</span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </>
+            )}
+          </button>
+        </div>
+
         {/* Two-Column Asymmetric Dashboard Hero (Matching Reference Graphic) */}
+        {showOverviewDashboard && (
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           {/* Left Column: 3-Step Progression Timeline + Colored Division Counters + Hatched Overview Card */}
           <div className="lg:col-span-7 bg-white border border-[#E6EAE4] rounded-2xl p-5 flex flex-col gap-4">
@@ -1636,7 +1728,7 @@ export default function App() {
             </div>
 
             {/* Active Round Courts Snapshot Grid (Fills Left Card Cleanly Without Empty Gaps) */}
-            <div className="bg-[#F8F9F6] border border-[#E6EAE4] rounded-xl p-4 flex-1 flex flex-col justify-between gap-3">
+            <div className="bg-[#F8F9F6] border border-[#E6EAE4] rounded-xl p-4 flex-1 flex flex-col justify-start gap-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-bold uppercase tracking-wider text-[#111312]">
                   Round {activeRoundNumber} Live Court Lineup
@@ -2155,6 +2247,7 @@ export default function App() {
             </div>
           </div>
         </section>
+        )}
 
         {/* Active Swap Banner */}
         {selectedSwapPlayerId && (
