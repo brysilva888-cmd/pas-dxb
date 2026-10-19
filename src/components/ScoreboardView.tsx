@@ -1,6 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Download, RotateCcw, Search, Trophy, Users } from 'lucide-react';
+import {
+  Check,
+  Download,
+  FileText,
+  RotateCcw,
+  Search,
+  Trophy,
+  Users,
+} from 'lucide-react';
 import { Player, PlayerStats, Round } from '../types';
+import { downloadDashboardStatsPdf } from '../utils/pdfStatsGenerator';
 
 interface ScoreboardViewProps {
   players: Player[];
@@ -263,17 +272,27 @@ export const ScoreboardView: React.FC<ScoreboardViewProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <span className="text-xs font-mono tabular-nums text-slate-600">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <span className="text-xs font-mono tabular-nums text-slate-600 mr-1">
               Completed Matches: {totalCompletedMatches} / {totalScheduledMatches}
             </span>
+            <button
+              type="button"
+              onClick={() =>
+                downloadDashboardStatsPdf(players, statsMap, rounds)
+              }
+              className="px-4 py-2 text-xs font-bold text-[#111312] bg-[#98F64F] border border-[#111312]/10 rounded-xl hover:bg-[#88E63E] transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 shadow-2xs"
+            >
+              <FileText className="w-3.5 h-3.5 text-[#111312]" />
+              <span>Download Stats (PDF)</span>
+            </button>
             <button
               type="button"
               onClick={handleExportPlayerStatsCsv}
               className="px-3.5 py-2 text-xs font-semibold text-white bg-[#111312] rounded-xl hover:bg-[#272B29] transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5 text-[#98F64F]" />
-              <span>Export Player Stats (.csv)</span>
+              <span>Export CSV</span>
             </button>
           </div>
         </div>
