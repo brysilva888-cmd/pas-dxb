@@ -299,11 +299,62 @@ export default function App() {
     [players, rounds]
   );
 
+  // Court appearances up through the currently active round (including completed or active court games)
+  const statsUpToActiveRoundMap = useMemo(
+    () => computePlayerStats(players, rounds, activeRoundNumber, false),
+    [players, rounds, activeRoundNumber]
+  );
+
   const currentRound =
     rounds.find((r) => r.roundNumber === activeRoundNumber) || rounds[0];
 
   const menPlayers = players.filter((p) => p.gender === 'M' && p.active);
   const womenPlayers = players.filter((p) => p.gender === 'F' && p.active);
+
+  const {
+    activePlayersCount,
+    playersWithCompletedGameCount,
+    playersOnCourtUpToRoundCount,
+    playersCompletedTargetCount,
+    allPlayersCompletedAtLeastOne,
+    allPlayersOnCourtUpToRound,
+    allPlayersFinishedTarget,
+  } = useMemo(() => {
+    const activeList = players.filter((p) => p.active);
+    const totalActive = activeList.length;
+    const targetGP = genderGamesTarget + mixedGamesTarget;
+
+    let completedAtLeastOne = 0;
+    let onCourtUpToNow = 0;
+    let finishedTarget = 0;
+
+    for (const p of activeList) {
+      const doneGP = playedStatsMap[p.id]?.gamesPlayed || 0;
+      const upToRoundGP = statsUpToActiveRoundMap[p.id]?.gamesPlayed || 0;
+      if (doneGP >= 1) completedAtLeastOne += 1;
+      if (doneGP >= 1 || upToRoundGP >= 1) onCourtUpToNow += 1;
+      if (doneGP >= targetGP && targetGP > 0) finishedTarget += 1;
+    }
+
+    return {
+      activePlayersCount: totalActive,
+      playersWithCompletedGameCount: completedAtLeastOne,
+      playersOnCourtUpToRoundCount: onCourtUpToNow,
+      playersCompletedTargetCount: finishedTarget,
+      allPlayersCompletedAtLeastOne:
+        totalActive > 0 && completedAtLeastOne === totalActive,
+      allPlayersOnCourtUpToRound:
+        totalActive > 0 && onCourtUpToNow === totalActive,
+      allPlayersFinishedTarget:
+        totalActive > 0 && finishedTarget === totalActive,
+    };
+  }, [
+    players,
+    playedStatsMap,
+    statsUpToActiveRoundMap,
+    genderGamesTarget,
+    mixedGamesTarget,
+  ]);
 
   const minGamesPlayed = useMemo(() => {
     const activeIds = players.filter((p) => p.active).map((p) => p.id);
@@ -1367,8 +1418,38 @@ export default function App() {
               </div>
 
               <span className="px-2.5 py-1 rounded-lg bg-[#F5F6F3] border border-[#E6EAE4] font-semibold text-[#111312] whitespace-nowrap">
-                {activeCourtsInRound} Courts · {players.filter((p) => p.active).length} Players · {currentRound?.benchPlayerIds.length || 0} Bench
+                {activeCourtsInRound} Courts · {activePlayersCount} Players · {currentRound?.benchPlayerIds.length || 0} Bench
               </span>
+
+              {/* All Players Played Status Indicator */}
+              {allPlayersFinishedTarget ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#111312] border border-[#F7D348] text-[#F7D348] font-bold whitespace-nowrap">
+                  <Check className="w-3.5 h-3.5 text-[#98F64F] shrink-0" />
+                  <span>
+                    All {activePlayersCount} Players Completed All {genderGamesTarget + mixedGamesTarget} Games!
+                  </span>
+                </span>
+              ) : allPlayersCompletedAtLeastOne ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#98F64F] text-[#111312] font-bold whitespace-nowrap shadow-2xs">
+                  <Check className="w-3.5 h-3.5 text-[#111312] shrink-0" />
+                  <span>
+                    All {activePlayersCount} Players Have Played! (Min {minGamesPlayed} GP)
+                  </span>
+                </span>
+              ) : allPlayersOnCourtUpToRound ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#EFFCE6] border border-[#65C71C] text-[#1E5E08] font-bold whitespace-nowrap">
+                  <Check className="w-3.5 h-3.5 text-[#287D0C] shrink-0" />
+                  <span>
+                    All {activePlayersCount} Players Assigned to Court by R{activeRoundNumber} ({playersWithCompletedGameCount}/{activePlayersCount} Scored)
+                  </span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FFF8DE] border border-[#F7D348] text-[#5C4500] font-semibold whitespace-nowrap">
+                  <span>
+                    Played: {playersWithCompletedGameCount}/{activePlayersCount} Scored · {playersOnCourtUpToRoundCount}/{activePlayersCount} On Court ({activePlayersCount - playersOnCourtUpToRoundCount} waiting 1st game)
+                  </span>
+                </span>
+              )}
 
               <button
                 type="button"
@@ -1647,6 +1728,61 @@ export default function App() {
                     {completedMatchesTotal} / {totalScheduledMatches}
                   </div>
                 </div>
+              </div>
+
+              {/* All Players Played Rotation Indicator Banner inside Overview */}
+              <div
+                className={`rounded-xl px-3.5 py-2.5 border flex flex-wrap items-center justify-between gap-2 text-xs ${
+                  allPlayersFinishedTarget
+                    ? 'bg-[#111312] border-[#F7D348] text-white'
+                    : allPlayersCompletedAtLeastOne
+                    ? 'bg-[#EFFCE6] border-[#65C71C] text-[#111312]'
+                    : allPlayersOnCourtUpToRound
+                    ? 'bg-[#F3FDE8] border-[#98F64F] text-[#111312]'
+                    : 'bg-white border-[#E6EAE4] text-[#111312]'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                      allPlayersCompletedAtLeastOne || allPlayersOnCourtUpToRound
+                        ? 'bg-[#98F64F] text-[#111312]'
+                        : 'bg-[#F7D348] text-[#111312]'
+                    }`}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="font-bold">
+                    {allPlayersFinishedTarget
+                      ? `All ${activePlayersCount} Players Completed All ${
+                          genderGamesTarget + mixedGamesTarget
+                        } Target Games!`
+                      : allPlayersCompletedAtLeastOne
+                      ? `All ${activePlayersCount} Active Players Have Played at Least 1 Completed Game!`
+                      : allPlayersOnCourtUpToRound
+                      ? `All ${activePlayersCount} Active Players Have Stepped On Court by Round ${activeRoundNumber}!`
+                      : `Player Rotation Progress: ${playersOnCourtUpToRoundCount} of ${activePlayersCount} Players Have Been On Court`}
+                  </span>
+                </div>
+                <span
+                  className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] whitespace-nowrap ${
+                    allPlayersFinishedTarget
+                      ? 'bg-[#F7D348] text-[#111312]'
+                      : allPlayersCompletedAtLeastOne || allPlayersOnCourtUpToRound
+                      ? 'bg-[#111312] text-[#98F64F]'
+                      : 'bg-[#FFF8DE] text-[#5C4500] border border-[#F7D348]'
+                  }`}
+                >
+                  {allPlayersCompletedAtLeastOne
+                    ? `100% Played (${playersCompletedTargetCount}/${activePlayersCount} at ${
+                        genderGamesTarget + mixedGamesTarget
+                      } GP)`
+                    : allPlayersOnCourtUpToRound
+                    ? `100% On Court · ${playersWithCompletedGameCount}/${activePlayersCount} Scored`
+                    : `${
+                        activePlayersCount - playersOnCourtUpToRoundCount
+                      } Waiting for 1st Game`}
+                </span>
               </div>
             </div>
 
@@ -2383,6 +2519,41 @@ export default function App() {
                   Ordered by rotation priority (fewest games played &amp; longest bench streak enter next round first).
                 </p>
 
+                {/* Bench Indicator when All Players Have Played */}
+                <div
+                  className={`mt-2.5 px-3 py-2 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                    allPlayersCompletedAtLeastOne || allPlayersOnCourtUpToRound
+                      ? 'bg-[#EFFCE6] border-[#65C71C] text-[#111312]'
+                      : 'bg-[#FFFDF4] border-[#F7D348] text-[#5C4500]'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-semibold">
+                    <Check
+                      className={`w-3.5 h-3.5 shrink-0 ${
+                        allPlayersCompletedAtLeastOne || allPlayersOnCourtUpToRound
+                          ? 'text-[#287D0C]'
+                          : 'text-[#B45309]'
+                      }`}
+                    />
+                    <span>
+                      {allPlayersFinishedTarget
+                        ? `All ${activePlayersCount} players completed ${
+                            genderGamesTarget + mixedGamesTarget
+                          } GP!`
+                        : allPlayersCompletedAtLeastOne
+                        ? `All ${activePlayersCount} players have played already!`
+                        : allPlayersOnCourtUpToRound
+                        ? `All ${activePlayersCount} players have been on court by R${activeRoundNumber}!`
+                        : `${
+                            activePlayersCount - playersOnCourtUpToRoundCount
+                          } player(s) still waiting for 1st game`}
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-[11px] whitespace-nowrap">
+                    {playersWithCompletedGameCount}/{activePlayersCount} Scored
+                  </span>
+                </div>
+
                 {quickImportBanner && (
                   <div className="mt-2.5 px-3 py-2 bg-[#EFFCE6] border border-[#BCEE94] rounded-xl text-xs text-[#111312] flex items-center justify-between gap-2">
                     <span>{quickImportBanner}</span>
@@ -2431,6 +2602,10 @@ export default function App() {
                 {currentRound.benchPlayerIds.map((pid, idx) => {
                   const player = playerMap[pid];
                   const st = playedStatsMap[pid];
+                  const completedGP = st?.gamesPlayed || 0;
+                  const courtGPUpToRound =
+                    statsUpToActiveRoundMap[pid]?.gamesPlayed || 0;
+                  const targetGP = genderGamesTarget + mixedGamesTarget;
                   const isNextUp = idx < activeCourtsInRound * 4;
                   const isSelected = selectedSwapPlayerId === pid;
                   if (!player) return null;
@@ -2460,11 +2635,28 @@ export default function App() {
                           <span className="text-xs font-semibold text-[#111312] truncate">
                             {player.name}
                           </span>
+                          {completedGP >= targetGP && targetGP > 0 ? (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-[#111312] text-[#98F64F] whitespace-nowrap shrink-0">
+                              ✓ All {completedGP} GP Done
+                            </span>
+                          ) : completedGP > 0 ? (
+                            <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-[#EFFCE6] text-[#1E5E08] border border-[#BCEE94] whitespace-nowrap shrink-0">
+                              ✓ Played ({completedGP} GP)
+                            </span>
+                          ) : courtGPUpToRound > 0 ? (
+                            <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-[#E9F7EC] text-[#1E5E08] whitespace-nowrap shrink-0">
+                              ✓ Played On Court
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-[#FFF8DE] text-[#5C4500] border border-[#F7D348] whitespace-nowrap shrink-0">
+                              0 GP · Waiting
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono tabular-nums mt-0.5 pl-7">
                           <span>{player.gender === 'M' ? 'Men' : 'Women'}</span>
                           <span aria-hidden="true">·</span>
-                          <span>{st?.gamesPlayed || 0} GP</span>
+                          <span>{completedGP} GP</span>
                           <span aria-hidden="true">·</span>
                           <span>Wait {st?.currentBenchStreak || 0}</span>
                           {isNextUp && (
