@@ -88,7 +88,12 @@ export const CourtCard: React.FC<CourtCardProps> = ({
             <span aria-hidden="true">·</span>
             <span>{stats ? stats.gamesPlayed : 0} GP</span>
             <span aria-hidden="true">·</span>
-            <span>{stats ? stats.uniqueOpponents.length : 0} Opp</span>
+            <span>
+              {stats
+                ? new Set([...stats.uniquePartners, ...stats.uniqueOpponents]).size
+                : 0}{' '}
+              Met
+            </span>
             <span aria-hidden="true">·</span>
             <span className="text-slate-400">{sideLabel}</span>
           </div>
@@ -154,15 +159,17 @@ export const CourtCard: React.FC<CourtCardProps> = ({
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 mt-1.5 font-mono tabular-nums">
-              <span
-                className={
-                  match.noveltyScore === 100
-                    ? 'text-[#287D0C] font-semibold'
-                    : 'text-slate-600'
-                }
-              >
-                {match.noveltyScore}% Unique Matchup
-              </span>
+              {match.repeatPartners === 0 && match.repeatOpponents === 0 ? (
+                <span className="text-[#287D0C] font-semibold">
+                  ✓ 100% First-Time Meetings (0 Repeats)
+                </span>
+              ) : (
+                <span className="text-amber-700 font-semibold">
+                  {match.noveltyScore}% Unique ·{' '}
+                  {match.repeatPartners + match.repeatOpponents} Repeat Meeting
+                  {match.repeatPartners + match.repeatOpponents === 1 ? '' : 's'}
+                </span>
+              )}
               <span aria-hidden="true">·</span>
               <span>{match.repeatOpponents} Repeat Opp</span>
               <span aria-hidden="true">·</span>

@@ -39,7 +39,9 @@ import {
   adjustRosterToCounts,
   advanceSingleCourtToNextGame,
   computePlayerStats,
+  countScheduleRepeatMeetings,
   createInitialRoster,
+  evaluateMatchCost,
   generateNextRound,
   generateTwoPhaseSchedule,
   ParsedBulkPlayer,
@@ -191,7 +193,24 @@ export default function App() {
             setPlayers(remoteData.players);
           }
           if (remoteData.rounds.length > 0) {
-            setRounds(remoteData.rounds);
+            const hasUnplayedRepeats =
+              countScheduleRepeatMeetings(
+                remoteData.rounds.filter(
+                  (r) => r.roundNumber >= remoteData.activeRoundNumber
+                )
+              ) > 0;
+            const nextRounds = hasUnplayedRepeats
+              ? syncRoundsWithUpdatedRoster(
+                  remoteData.players.length > 0 ? remoteData.players : players,
+                  remoteData.rounds,
+                  remoteData.activeRoundNumber,
+                  remoteData.courtCount,
+                  remoteData.menCourtsPhase1,
+                  remoteData.genderGamesTarget,
+                  remoteData.mixedGamesTarget
+                )
+              : remoteData.rounds;
+            setRounds(nextRounds);
           }
         }
       },
@@ -865,9 +884,27 @@ export default function App() {
     const p1 = selectedSwapPlayerId;
     const p2 = targetPlayerId;
 
-    setRounds((prevRounds) =>
-      prevRounds.map((round) => {
+    setRounds((prevRounds) => {
+      const priorStatsMap = computePlayerStats(
+        players,
+        prevRounds,
+        activeRoundNumber - 1
+      );
+
+      return prevRounds.map((round) => {
         if (round.roundNumber !== activeRoundNumber) return round;
+
+        // Also include any archived matches already finished in this round
+        const statsWithArchive = round.archivedMatches?.length
+          ? computePlayerStats(
+              players,
+              [
+                ...prevRounds.filter((r) => r.roundNumber < activeRoundNumber),
+                { ...round, matches: [] },
+              ],
+              activeRoundNumber
+            )
+          : priorStatsMap;
 
         const swapId = (id: string) => {
           if (id === p1) return p2;
@@ -875,11 +912,29 @@ export default function App() {
           return id;
         };
 
-        const updatedMatches = round.matches.map((m) => ({
-          ...m,
-          teamA: [swapId(m.teamA[0]), swapId(m.teamA[1])] as [string, string],
-          teamB: [swapId(m.teamB[0]), swapId(m.teamB[1])] as [string, string],
-        }));
+        const updatedMatches = round.matches.map((m) => {
+          const nextTeamA: [string, string] = [
+            swapId(m.teamA[0]),
+            swapId(m.teamA[1]),
+          ];
+          const nextTeamB: [string, string] = [
+            swapId(m.teamB[0]),
+            swapId(m.teamB[1]),
+          ];
+          const evalRes = evaluateMatchCost(
+            nextTeamA,
+            nextTeamB,
+            statsWithArchive
+          );
+          return {
+            ...m,
+            teamA: nextTeamA,
+            teamB: nextTeamB,
+            noveltyScore: evalRes.noveltyScore,
+            repeatPartners: evalRes.repeatPartners,
+            repeatOpponents: evalRes.repeatOpponents,
+          };
+        });
 
         const updatedBench = round.benchPlayerIds.map((id) => swapId(id));
 
@@ -888,8 +943,8 @@ export default function App() {
           matches: updatedMatches,
           benchPlayerIds: updatedBench,
         };
-      })
-    );
+      });
+    });
 
     setSelectedSwapPlayerId(null);
   };
@@ -1661,7 +1716,7 @@ export default function App() {
                       : `Round ${activeRoundNumber} Gender Doubles`}
                   </h2>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    Every player is scheduled for {genderGamesTarget} Gender Doubles games and {mixedGamesTarget} Mixed Doubles game ({genderGamesTarget + mixedGamesTarget} total games).
+                    Every player is scheduled for {genderGamesTarget} Gender Doubles games and {mixedGamesTarget} Mixed Doubles game ({genderGamesTarget + mixedGamesTarget} total games) · <span className="font-semibold text-[#287D0C]">Strict Rule: No Player Meets the Same Person Again</span>.
                   </p>
                 </div>
                 <div className="flex items-center gap-1 bg-white border border-[#E6EAE4] p-1 rounded-xl">

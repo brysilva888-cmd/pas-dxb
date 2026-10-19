@@ -46,21 +46,23 @@ export const MatchupMatrixView: React.FC<MatchupMatrixViewProps> = ({
     ? activeStatsMap[inspectedPlayer.id]
     : null;
 
-  // Compute global novelty metrics
-  let totalMatchups = 0;
-  let uniqueMatchupCount = 0;
+  // Compute global novelty metrics across all 6 pairs per doubles court (2 partner + 4 opponent relationships)
+  let totalPairings = 0;
+  let totalRepeatMeetings = 0;
   for (const r of rounds) {
     const matchesToCount =
       viewMode === 'PLAYED'
         ? [...(r.archivedMatches || []), ...r.matches].filter((m) => m.completed)
         : [...(r.archivedMatches || []), ...r.matches];
     for (const m of matchesToCount) {
-      totalMatchups += 4; // 4 opponent relationships per doubles game
-      uniqueMatchupCount += 4 - m.repeatOpponents;
+      totalPairings += 6; // 6 pairwise player meetings per 4-player court
+      totalRepeatMeetings += (m.repeatPartners || 0) + (m.repeatOpponents || 0);
     }
   }
-  const uniqueOpponentRate =
-    totalMatchups > 0 ? Math.round((uniqueMatchupCount / totalMatchups) * 100) : 100;
+  const uniqueMeetingRate =
+    totalPairings > 0
+      ? Math.round(((totalPairings - totalRepeatMeetings) / totalPairings) * 100)
+      : 100;
 
   return (
     <div className="space-y-6">
@@ -69,10 +71,10 @@ export const MatchupMatrixView: React.FC<MatchupMatrixViewProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#E6EAE4]">
           <div>
             <h2 className="text-lg font-bold text-[#111312] font-display">
-              Opponent &amp; Partner Diversity Audit
+              Opponent &amp; Partner Diversity Audit (No Repeat Meetings Rule)
             </h2>
             <p className="text-sm text-slate-600 mt-0.5">
-              Verifies how many unique opponents and partners each player has met across Gender Doubles and Mixed Doubles phases.
+              Enforces the strict rule that no player meets the same person again on any court (neither as a partner nor as an opponent).
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -100,8 +102,16 @@ export const MatchupMatrixView: React.FC<MatchupMatrixViewProps> = ({
                 Full Scheduled Plan ({rounds.length} Rounds)
               </button>
             </div>
-            <div className="flex items-center gap-3 text-xs font-mono tabular-nums text-[#111312] font-semibold">
-              <span>Unique Opponent Rate: {uniqueOpponentRate}%</span>
+            <div
+              className={`px-3 py-1.5 rounded-lg border text-xs font-mono tabular-nums font-semibold ${
+                totalRepeatMeetings === 0
+                  ? 'bg-[#EFFCE6] border-[#98F64F] text-[#1F6309]'
+                  : 'bg-[#FFF6D6] border-[#F7D348] text-[#6B4F00]'
+              }`}
+            >
+              {totalRepeatMeetings === 0
+                ? `✓ 100% Unique Meetings (0 Repeats)`
+                : `Unique Meeting Rate: ${uniqueMeetingRate}% (${totalRepeatMeetings} Repeats)`}
             </div>
           </div>
         </div>

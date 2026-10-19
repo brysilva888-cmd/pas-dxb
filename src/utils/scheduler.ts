@@ -312,7 +312,18 @@ export function computePlayerStats(
   return statsMap;
 }
 
-function evaluateMatchCost(
+export function getPairMeetingCount(
+  p1: string,
+  p2: string,
+  statsMap: Record<string, PlayerStats>
+): number {
+  if (p1 === p2) return 999;
+  const st = statsMap[p1];
+  if (!st) return 0;
+  return (st.partnerCounts[p2] || 0) + (st.opponentCounts[p2] || 0);
+}
+
+export function evaluateMatchCost(
   teamA: [string, string],
   teamB: [string, string],
   statsMap: Record<string, PlayerStats>
@@ -325,43 +336,50 @@ function evaluateMatchCost(
   const [a1, a2] = teamA;
   const [b1, b2] = teamB;
 
-  const repPartnerA = statsMap[a1]?.partnerCounts[a2] || 0;
-  const repPartnerB = statsMap[b1]?.partnerCounts[b2] || 0;
-  const repeatPartners = repPartnerA + repPartnerB;
+  // Strict Rule: No player may meet the same person again (whether prior meeting was as partner OR opponent)
+  const metPartnerA = getPairMeetingCount(a1, a2, statsMap);
+  const metPartnerB = getPairMeetingCount(b1, b2, statsMap);
+  const repeatPartnersTotal = metPartnerA + metPartnerB;
 
-  const repOpp1 = statsMap[a1]?.opponentCounts[b1] || 0;
-  const repOpp2 = statsMap[a1]?.opponentCounts[b2] || 0;
-  const repOpp3 = statsMap[a2]?.opponentCounts[b1] || 0;
-  const repOpp4 = statsMap[a2]?.opponentCounts[b2] || 0;
-  const repeatOpponents = repOpp1 + repOpp2 + repOpp3 + repOpp4;
+  const metOpp1 = getPairMeetingCount(a1, b1, statsMap);
+  const metOpp2 = getPairMeetingCount(a1, b2, statsMap);
+  const metOpp3 = getPairMeetingCount(a2, b1, statsMap);
+  const metOpp4 = getPairMeetingCount(a2, b2, statsMap);
+  const repeatOpponentsTotal = metOpp1 + metOpp2 + metOpp3 + metOpp4;
 
-  // Heavy penalty for repeat partners and repeat opponents
+  const exactRepPartnerA = statsMap[a1]?.partnerCounts[a2] || 0;
+  const exactRepPartnerB = statsMap[b1]?.partnerCounts[b2] || 0;
+
+  // Massive penalty for any repeat meeting of the same person on a court
   const cost =
-    repeatPartners * 600 +
-    repeatOpponents * 280 +
-    (repOpp1 > 1 ? 300 : 0) +
-    (repOpp2 > 1 ? 300 : 0) +
-    (repOpp3 > 1 ? 300 : 0) +
-    (repOpp4 > 1 ? 300 : 0);
+    repeatPartnersTotal * 12000 +
+    repeatOpponentsTotal * 10000 +
+    (exactRepPartnerA + exactRepPartnerB) * 1500 +
+    (metPartnerA > 1 ? 5000 : 0) +
+    (metPartnerB > 1 ? 5000 : 0) +
+    (metOpp1 > 1 ? 4000 : 0) +
+    (metOpp2 > 1 ? 4000 : 0) +
+    (metOpp3 > 1 ? 4000 : 0) +
+    (metOpp4 > 1 ? 4000 : 0);
 
   let newRelationships = 0;
-  if (repPartnerA === 0) newRelationships++;
-  if (repPartnerB === 0) newRelationships++;
-  if (repOpp1 === 0) newRelationships++;
-  if (repOpp2 === 0) newRelationships++;
-  if (repOpp3 === 0) newRelationships++;
-  if (repOpp4 === 0) newRelationships++;
+  if (metPartnerA === 0) newRelationships++;
+  if (metPartnerB === 0) newRelationships++;
+  if (metOpp1 === 0) newRelationships++;
+  if (metOpp2 === 0) newRelationships++;
+  if (metOpp3 === 0) newRelationships++;
+  if (metOpp4 === 0) newRelationships++;
 
   const noveltyScore = Math.round((newRelationships / 6) * 100);
 
   return {
     cost,
-    repeatPartners: (repPartnerA > 0 ? 1 : 0) + (repPartnerB > 0 ? 1 : 0),
+    repeatPartners: (metPartnerA > 0 ? 1 : 0) + (metPartnerB > 0 ? 1 : 0),
     repeatOpponents:
-      (repOpp1 > 0 ? 1 : 0) +
-      (repOpp2 > 0 ? 1 : 0) +
-      (repOpp3 > 0 ? 1 : 0) +
-      (repOpp4 > 0 ? 1 : 0),
+      (metOpp1 > 0 ? 1 : 0) +
+      (metOpp2 > 0 ? 1 : 0) +
+      (metOpp3 > 0 ? 1 : 0) +
+      (metOpp4 > 0 ? 1 : 0),
     noveltyScore,
   };
 }
@@ -445,8 +463,10 @@ function sortCandidatesByPriority(
     if (sa.currentBenchStreak !== sb.currentBenchStreak) {
       return sb.currentBenchStreak - sa.currentBenchStreak;
     }
-    if (sa.uniqueOpponents.length !== sb.uniqueOpponents.length) {
-      return sa.uniqueOpponents.length - sb.uniqueOpponents.length;
+    const metA = new Set([...sa.uniquePartners, ...sa.uniqueOpponents]).size;
+    const metB = new Set([...sb.uniquePartners, ...sb.uniqueOpponents]).size;
+    if (metA !== metB) {
+      return metB - metA; // Place more-constrained players first within the exact same priority tier
     }
     const hashA =
       (a.id.charCodeAt(0) * 31 + a.id.charCodeAt(a.id.length - 1) + seedOffset * 17) %
@@ -456,6 +476,110 @@ function sortCandidatesByPriority(
       97;
     return hashA - hashB;
   });
+}
+
+/**
+ * Exact bitmask backtracking solver that finds `targetCourts` disjoint 4-player courts
+ * from `poolIds` where NO two players on the same court have EVER met before (neither as partner nor opponent).
+ */
+function solveZeroConflictSamePool(
+  targetCourts: number,
+  poolIds: string[],
+  statsMap: Record<string, PlayerStats>,
+  mustIncludeCount = 0
+): Array<[string, string, string, string]> | null {
+  const n = poolIds.length;
+  if (n < targetCourts * 4 || targetCourts <= 0) return null;
+
+  const conflictMasks: bigint[] = new Array(n).fill(0n);
+  for (let i = 0; i < n; i++) {
+    let mask = 1n << BigInt(i);
+    for (let j = 0; j < n; j++) {
+      if (i !== j && getPairMeetingCount(poolIds[i], poolIds[j], statsMap) > 0) {
+        mask |= 1n << BigInt(j);
+      }
+    }
+    conflictMasks[i] = mask;
+  }
+
+  const chosenCourts: Array<[number, number, number, number]> = [];
+  let steps = 0;
+  const maxSteps = 14000;
+
+  const backtrack = (
+    courtIdx: number,
+    usedMask: bigint,
+    minFirstIdx: number,
+    skipsRemaining: number
+  ): boolean => {
+    if (courtIdx === targetCourts) return true;
+    if (++steps > maxSteps) return false;
+
+    // Count remaining available players from minFirstIdx..n-1
+    let a = minFirstIdx;
+    while (a < n && (usedMask & (1n << BigInt(a))) !== 0n) {
+      a++;
+    }
+    if (a >= n) return false;
+
+    const courtsLeft = targetCourts - courtIdx;
+    if (n - a < courtsLeft * 4) return false;
+
+    const bitA = 1n << BigInt(a);
+    const maskA = usedMask | conflictMasks[a];
+
+    // Branch 1: Include player `a` in court `courtIdx`
+    for (let b = a + 1; b < n; b++) {
+      const bitB = 1n << BigInt(b);
+      if ((maskA & bitB) !== 0n) continue;
+      const maskAB = maskA | conflictMasks[b];
+
+      for (let c = b + 1; c < n; c++) {
+        const bitC = 1n << BigInt(c);
+        if ((maskAB & bitC) !== 0n) continue;
+        const maskABC = maskAB | conflictMasks[c];
+
+        for (let d = c + 1; d < n; d++) {
+          const bitD = 1n << BigInt(d);
+          if ((maskABC & bitD) !== 0n) continue;
+
+          chosenCourts.push([a, b, c, d]);
+          if (
+            backtrack(
+              courtIdx + 1,
+              usedMask | bitA | bitB | bitC | bitD,
+              a + 1,
+              skipsRemaining
+            )
+          ) {
+            return true;
+          }
+          chosenCourts.pop();
+          if (steps > maxSteps) return false;
+        }
+      }
+    }
+
+    // Branch 2: Skip player `a` if `a >= mustIncludeCount` and we have spare candidates
+    if (a >= mustIncludeCount && skipsRemaining > 0) {
+      if (backtrack(courtIdx, usedMask | bitA, a + 1, skipsRemaining - 1)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const maxSkips = Math.max(0, n - targetCourts * 4);
+  if (backtrack(0, 0n, 0, maxSkips)) {
+    return chosenCourts.map(([a, b, c, d]) => [
+      poolIds[a],
+      poolIds[b],
+      poolIds[c],
+      poolIds[d],
+    ]);
+  }
+  return null;
 }
 
 function optimizeSamePoolCourts(
@@ -476,33 +600,101 @@ function optimizeSamePoolCourts(
   const cutoffPlayer = prioritizedCandidates[needed - 1];
   const cutoffStats = statsMap[cutoffPlayer.id];
 
-  const mustPlay: string[] = [];
-  const tiedPool: string[] = [];
+  // Players strictly behind in games played vs players in the same gamesPlayed wave
+  const strictMustPlay: string[] = [];
+  const sameWaveTied: string[] = [];
+  const laterWave: string[] = [];
 
   for (const p of prioritizedCandidates) {
     const st = statsMap[p.id];
     if (
       st.genderGamesPlayed < cutoffStats.genderGamesPlayed ||
       (st.genderGamesPlayed === cutoffStats.genderGamesPlayed &&
-        st.gamesPlayed < cutoffStats.gamesPlayed) ||
-      (st.genderGamesPlayed === cutoffStats.genderGamesPlayed &&
-        st.gamesPlayed === cutoffStats.gamesPlayed &&
-        st.currentBenchStreak > cutoffStats.currentBenchStreak)
+        st.gamesPlayed < cutoffStats.gamesPlayed)
     ) {
-      mustPlay.push(p.id);
+      strictMustPlay.push(p.id);
     } else if (
       st.genderGamesPlayed === cutoffStats.genderGamesPlayed &&
-      st.gamesPlayed === cutoffStats.gamesPlayed &&
-      st.currentBenchStreak === cutoffStats.currentBenchStreak
+      st.gamesPlayed === cutoffStats.gamesPlayed
     ) {
-      tiedPool.push(p.id);
+      sameWaveTied.push(p.id);
+    } else {
+      laterWave.push(p.id);
     }
   }
 
-  let bestArrangement: string[] = [
-    ...mustPlay,
-    ...tiedPool.slice(0, needed - mustPlay.length),
-  ];
+  // Deterministically rotate the tied wave slightly by roundSeed while keeping longer bench streaks first
+  const rotatedTied = [...sameWaveTied].sort((idA, idB) => {
+    const sa = statsMap[idA];
+    const sb = statsMap[idB];
+    if (sa && sb && sa.currentBenchStreak !== sb.currentBenchStreak) {
+      return sb.currentBenchStreak - sa.currentBenchStreak;
+    }
+    const degA = sa ? new Set([...sa.uniquePartners, ...sa.uniqueOpponents]).size : 0;
+    const degB = sb ? new Set([...sb.uniquePartners, ...sb.uniqueOpponents]).size : 0;
+    if (degA !== degB) return degB - degA;
+    const hA = (idA.charCodeAt(idA.length - 1) * 29 + roundSeed * 13) % 89;
+    const hB = (idB.charCodeAt(idB.length - 1) * 29 + roundSeed * 13) % 89;
+    return hA - hB;
+  });
+
+  const activeWavePool = [...strictMustPlay, ...rotatedTied];
+  const allCandidateIds = [...activeWavePool, ...laterWave];
+
+  let zeroConflictGroups: Array<[string, string, string, string]> | null = null;
+
+  // 1. Wave Lookahead: if activeWavePool has multiple courts left in this GP wave, solve the whole wave
+  // so the remaining players in the wave are guaranteed conflict-free for the next round!
+  const waveTotalCourts = Math.min(5, Math.floor(activeWavePool.length / 4));
+  if (waveTotalCourts > courtCount) {
+    const fullWaveSolution = solveZeroConflictSamePool(
+      waveTotalCourts,
+      activeWavePool,
+      statsMap,
+      strictMustPlay.length
+    );
+    if (fullWaveSolution) {
+      zeroConflictGroups = fullWaveSolution.slice(0, courtCount);
+    }
+  }
+
+  // 2. Exact `courtCount` within activeWavePool including all strictMustPlay players
+  if (!zeroConflictGroups) {
+    zeroConflictGroups = solveZeroConflictSamePool(
+      courtCount,
+      activeWavePool,
+      statsMap,
+      strictMustPlay.length
+    );
+  }
+
+  // 3. Exact `courtCount` within activeWavePool with flexible mustPlay if two mustPlay players already met
+  if (!zeroConflictGroups) {
+    zeroConflictGroups = solveZeroConflictSamePool(
+      courtCount,
+      activeWavePool,
+      statsMap,
+      0
+    );
+  }
+
+  // 4. Exact `courtCount` across all active candidates (requiring strictMustPlay if possible, then any conflict-free)
+  if (!zeroConflictGroups) {
+    zeroConflictGroups =
+      solveZeroConflictSamePool(
+        courtCount,
+        allCandidateIds,
+        statsMap,
+        strictMustPlay.length
+      ) || solveZeroConflictSamePool(courtCount, allCandidateIds, statsMap, 0);
+  }
+
+  if (zeroConflictGroups) {
+    return zeroConflictGroups.map((group) => bestSingleCourtSplit(group, statsMap));
+  }
+
+  // 5. Fallback local optimizer (only reached on tiny rosters where every possible pair has already met)
+  let bestArrangement: string[] = allCandidateIds.slice(0, needed);
 
   const evaluateArrangement = (arr: string[]) => {
     let totalCost = 0;
@@ -523,20 +715,19 @@ function optimizeSamePoolCourts(
 
   let bestScore = evaluateArrangement(bestArrangement);
   let currentArr = [...bestArrangement];
-  let currentTiedUnused = tiedPool.slice(needed - mustPlay.length);
+  let currentUnused = allCandidateIds.slice(needed);
 
-  for (let iter = 0; iter < 180; iter++) {
+  for (let iter = 0; iter < 320; iter++) {
     if (bestScore.totalCost === 0) break;
 
     const nextArr = [...currentArr];
-    const nextUnused = [...currentTiedUnused];
+    const nextUnused = [...currentUnused];
 
-    if (nextUnused.length > 0 && iter % 3 === 0 && needed > mustPlay.length) {
-      const tiedSlotIdx =
-        mustPlay.length + ((iter * 13 + roundSeed * 7) % (needed - mustPlay.length));
+    if (nextUnused.length > 0 && iter % 2 === 0) {
+      const slotIdx = (iter * 13 + roundSeed * 7) % needed;
       const unusedIdx = (iter * 19 + roundSeed * 11) % nextUnused.length;
-      const temp = nextArr[tiedSlotIdx];
-      nextArr[tiedSlotIdx] = nextUnused[unusedIdx];
+      const temp = nextArr[slotIdx];
+      nextArr[slotIdx] = nextUnused[unusedIdx];
       nextUnused[unusedIdx] = temp;
     } else if (needed >= 4) {
       const idx1 = (iter * 7 + roundSeed * 3) % needed;
@@ -553,11 +744,163 @@ function optimizeSamePoolCourts(
       bestScore = candidateEval;
       bestArrangement = nextArr;
       currentArr = nextArr;
-      currentTiedUnused = nextUnused;
+      currentUnused = nextUnused;
     }
   }
 
   return bestScore.courtResults;
+}
+
+/**
+ * Exact solver for Mixed Doubles courts ensuring no two players placed on a court
+ * have ever met before (neither across genders nor within the same gender).
+ */
+function solveZeroConflictMixedPool(
+  targetCourts: number,
+  menIds: string[],
+  womenIds: string[],
+  statsMap: Record<string, PlayerStats>,
+  mustMenCount = 0,
+  mustWomenCount = 0,
+  enforceSameGenderUnmet = true
+): Array<{ men: [string, string]; women: [string, string] }> | null {
+  const nM = menIds.length;
+  const nW = womenIds.length;
+  if (nM < targetCourts * 2 || nW < targetCourts * 2 || targetCourts <= 0) {
+    return null;
+  }
+
+  const chosen: Array<{ m1: number; m2: number; w1: number; w2: number }> = [];
+  let steps = 0;
+  const maxSteps = 14000;
+
+  const backtrack = (
+    courtIdx: number,
+    usedMenMask: bigint,
+    usedWomenMask: bigint,
+    minM: number,
+    menSkipsLeft: number,
+    womenSkipsLeft: number
+  ): boolean => {
+    if (courtIdx === targetCourts) return true;
+    if (++steps > maxSteps) return false;
+
+    let m1 = minM;
+    while (m1 < nM && (usedMenMask & (1n << BigInt(m1))) !== 0n) {
+      m1++;
+    }
+    if (m1 >= nM) return false;
+    if (nM - m1 < (targetCourts - courtIdx) * 2) return false;
+
+    const bitM1 = 1n << BigInt(m1);
+    const idM1 = menIds[m1];
+
+    // Branch 1: Include man `m1`
+    for (let m2 = m1 + 1; m2 < nM; m2++) {
+      const bitM2 = 1n << BigInt(m2);
+      if ((usedMenMask & bitM2) !== 0n) continue;
+      const idM2 = menIds[m2];
+
+      if (
+        enforceSameGenderUnmet &&
+        getPairMeetingCount(idM1, idM2, statsMap) > 0
+      ) {
+        continue;
+      }
+
+      for (let w1 = 0; w1 < nW; w1++) {
+        const bitW1 = 1n << BigInt(w1);
+        if ((usedWomenMask & bitW1) !== 0n) continue;
+        if (w1 < mustWomenCount && womenSkipsLeft < 0) continue;
+        const idW1 = womenIds[w1];
+
+        if (
+          getPairMeetingCount(idM1, idW1, statsMap) > 0 ||
+          getPairMeetingCount(idM2, idW1, statsMap) > 0
+        ) {
+          continue;
+        }
+
+        for (let w2 = w1 + 1; w2 < nW; w2++) {
+          const bitW2 = 1n << BigInt(w2);
+          if ((usedWomenMask & bitW2) !== 0n) continue;
+          const idW2 = womenIds[w2];
+
+          if (
+            enforceSameGenderUnmet &&
+            getPairMeetingCount(idW1, idW2, statsMap) > 0
+          ) {
+            continue;
+          }
+          if (
+            getPairMeetingCount(idM1, idW2, statsMap) > 0 ||
+            getPairMeetingCount(idM2, idW2, statsMap) > 0
+          ) {
+            continue;
+          }
+
+          chosen.push({ m1, m2, w1, w2 });
+          if (
+            backtrack(
+              courtIdx + 1,
+              usedMenMask | bitM1 | bitM2,
+              usedWomenMask | bitW1 | bitW2,
+              m1 + 1,
+              menSkipsLeft,
+              womenSkipsLeft
+            )
+          ) {
+            return true;
+          }
+          chosen.pop();
+          if (steps > maxSteps) return false;
+        }
+      }
+    }
+
+    // Branch 2: Skip `m1` if allowed
+    if (m1 >= mustMenCount && menSkipsLeft > 0) {
+      if (
+        backtrack(
+          courtIdx,
+          usedMenMask | bitM1,
+          usedWomenMask,
+          m1 + 1,
+          menSkipsLeft - 1,
+          womenSkipsLeft
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const maxMenSkips = Math.max(0, nM - targetCourts * 2);
+  const maxWomenSkips = Math.max(0, nW - targetCourts * 2);
+
+  if (backtrack(0, 0n, 0n, 0, maxMenSkips, maxWomenSkips)) {
+    // Verify mustWomenCount constraint if mustWomenCount > 0
+    if (mustWomenCount > 0) {
+      const usedW = new Set<number>();
+      for (const c of chosen) {
+        usedW.add(c.w1);
+        usedW.add(c.w2);
+      }
+      for (let w = 0; w < Math.min(mustWomenCount, targetCourts * 2); w++) {
+        if (!usedW.has(w)) {
+          return null;
+        }
+      }
+    }
+    return chosen.map((c) => ({
+      men: [menIds[c.m1], menIds[c.m2]],
+      women: [womenIds[c.w1], womenIds[c.w2]],
+    }));
+  }
+
+  return null;
 }
 
 function optimizeMixedCourts(
@@ -582,43 +925,96 @@ function optimizeMixedCourts(
     return [];
   }
 
-  const splitPriority = (list: Player[], count: number) => {
+  const buildWavePools = (list: Player[], count: number) => {
     const cutoff = statsMap[list[count - 1].id];
-    const must: string[] = [];
-    const tied: string[] = [];
+    const strictMust: string[] = [];
+    const sameWave: string[] = [];
+    const laterWave: string[] = [];
     for (const p of list) {
       const st = statsMap[p.id];
       if (
         st.mixedGamesPlayed < cutoff.mixedGamesPlayed ||
         (st.mixedGamesPlayed === cutoff.mixedGamesPlayed &&
-          st.gamesPlayed < cutoff.gamesPlayed) ||
-        (st.mixedGamesPlayed === cutoff.mixedGamesPlayed &&
-          st.gamesPlayed === cutoff.gamesPlayed &&
-          st.currentBenchStreak > cutoff.currentBenchStreak)
+          st.gamesPlayed < cutoff.gamesPlayed)
       ) {
-        must.push(p.id);
+        strictMust.push(p.id);
       } else if (
         st.mixedGamesPlayed === cutoff.mixedGamesPlayed &&
-        st.gamesPlayed === cutoff.gamesPlayed &&
-        st.currentBenchStreak === cutoff.currentBenchStreak
+        st.gamesPlayed === cutoff.gamesPlayed
       ) {
-        tied.push(p.id);
+        sameWave.push(p.id);
+      } else {
+        laterWave.push(p.id);
       }
     }
     return {
-      active: [...must, ...tied.slice(0, count - must.length)],
-      mustLen: must.length,
-      unusedTied: tied.slice(count - must.length),
+      waveIds: [...strictMust, ...sameWave],
+      allIds: [...strictMust, ...sameWave, ...laterWave],
+      mustLen: strictMust.length,
     };
   };
 
-  const menPool = splitPriority(prioritizedMen, neededPerGender);
-  const womenPool = splitPriority(prioritizedWomen, neededPerGender);
+  const menPool = buildWavePools(prioritizedMen, neededPerGender);
+  const womenPool = buildWavePools(prioritizedWomen, neededPerGender);
 
-  let currentMen = [...menPool.active];
-  let unusedMen = [...menPool.unusedTied];
-  let currentWomen = [...womenPool.active];
-  let unusedWomen = [...womenPool.unusedTied];
+  // Try strict 0-repeat-meeting solver (neither same-gender nor mixed-gender pairs have ever met)
+  const exactSolution =
+    solveZeroConflictMixedPool(
+      courtCount,
+      menPool.waveIds,
+      womenPool.waveIds,
+      statsMap,
+      menPool.mustLen,
+      womenPool.mustLen,
+      true
+    ) ||
+    solveZeroConflictMixedPool(
+      courtCount,
+      menPool.waveIds,
+      womenPool.waveIds,
+      statsMap,
+      0,
+      0,
+      true
+    ) ||
+    solveZeroConflictMixedPool(
+      courtCount,
+      menPool.allIds,
+      womenPool.allIds,
+      statsMap,
+      menPool.mustLen,
+      womenPool.mustLen,
+      true
+    ) ||
+    solveZeroConflictMixedPool(
+      courtCount,
+      menPool.allIds,
+      womenPool.allIds,
+      statsMap,
+      0,
+      0,
+      true
+    ) ||
+    solveZeroConflictMixedPool(
+      courtCount,
+      menPool.allIds,
+      womenPool.allIds,
+      statsMap,
+      0,
+      0,
+      false
+    );
+
+  if (exactSolution) {
+    return exactSolution.map((c) =>
+      bestMixedCourtSplit(c.men, c.women, statsMap)
+    );
+  }
+
+  let currentMen = menPool.allIds.slice(0, neededPerGender);
+  let unusedMen = menPool.allIds.slice(neededPerGender);
+  let currentWomen = womenPool.allIds.slice(0, neededPerGender);
+  let unusedWomen = womenPool.allIds.slice(neededPerGender);
 
   const evaluateMixed = (mArr: string[], wArr: string[]) => {
     let totalCost = 0;
@@ -635,7 +1031,7 @@ function optimizeMixedCourts(
 
   let bestEval = evaluateMixed(currentMen, currentWomen);
 
-  for (let iter = 0; iter < 220; iter++) {
+  for (let iter = 0; iter < 320; iter++) {
     if (bestEval.totalCost === 0) break;
 
     const nextM = [...currentMen];
@@ -656,25 +1052,14 @@ function optimizeMixedCourts(
       const tmp = nextW[i1];
       nextW[i1] = nextW[i2];
       nextW[i2] = tmp;
-    } else if (
-      mode === 2 &&
-      nextUnusedM.length > 0 &&
-      neededPerGender > menPool.mustLen
-    ) {
-      const slot =
-        menPool.mustLen + ((iter * 13 + roundSeed) % (neededPerGender - menPool.mustLen));
+    } else if (mode === 2 && nextUnusedM.length > 0) {
+      const slot = (iter * 13 + roundSeed) % neededPerGender;
       const uIdx = (iter * 17 + roundSeed) % nextUnusedM.length;
       const tmp = nextM[slot];
       nextM[slot] = nextUnusedM[uIdx];
       nextUnusedM[uIdx] = tmp;
-    } else if (
-      mode === 3 &&
-      nextUnusedW.length > 0 &&
-      neededPerGender > womenPool.mustLen
-    ) {
-      const slot =
-        womenPool.mustLen +
-        ((iter * 13 + roundSeed) % (neededPerGender - womenPool.mustLen));
+    } else if (mode === 3 && nextUnusedW.length > 0) {
+      const slot = (iter * 13 + roundSeed) % neededPerGender;
       const uIdx = (iter * 19 + roundSeed) % nextUnusedW.length;
       const tmp = nextW[slot];
       nextW[slot] = nextUnusedW[uIdx];
@@ -698,9 +1083,11 @@ export function generateNextRound(
   players: Player[],
   existingRounds: Round[],
   courtConfigs: CourtConfig[],
-  phase: PlayPhase
+  phase: PlayPhase,
+  seedBonus = 0
 ): Round {
   const nextRoundNumber = existingRounds.length + 1;
+  const effectiveSeed = nextRoundNumber + seedBonus * 37;
   const statsMap = computePlayerStats(players, existingRounds);
 
   const activePlayers = players.filter((p) => p.active);
@@ -716,7 +1103,7 @@ export function generateNextRound(
     const availMen = sortCandidatesByPriority(
       activePlayers.filter((p) => p.gender === 'M' && !assignedPlayerIds.has(p.id)),
       statsMap,
-      nextRoundNumber,
+      effectiveSeed,
       'GENDER'
     );
     const maxCourts = Math.min(mensCourts.length, Math.floor(availMen.length / 4));
@@ -724,7 +1111,7 @@ export function generateNextRound(
       maxCourts,
       availMen,
       statsMap,
-      nextRoundNumber
+      effectiveSeed
     );
     results.forEach((res, idx) => {
       const court = mensCourts[idx];
@@ -752,7 +1139,7 @@ export function generateNextRound(
     const availWomen = sortCandidatesByPriority(
       activePlayers.filter((p) => p.gender === 'F' && !assignedPlayerIds.has(p.id)),
       statsMap,
-      nextRoundNumber + 100,
+      effectiveSeed + 100,
       'GENDER'
     );
     const maxCourts = Math.min(womensCourts.length, Math.floor(availWomen.length / 4));
@@ -760,7 +1147,7 @@ export function generateNextRound(
       maxCourts,
       availWomen,
       statsMap,
-      nextRoundNumber + 100
+      effectiveSeed + 100
     );
     results.forEach((res, idx) => {
       const court = womensCourts[idx];
@@ -788,13 +1175,13 @@ export function generateNextRound(
     const availMen = sortCandidatesByPriority(
       activePlayers.filter((p) => p.gender === 'M' && !assignedPlayerIds.has(p.id)),
       statsMap,
-      nextRoundNumber + 200,
+      effectiveSeed + 200,
       'MIXED'
     );
     const availWomen = sortCandidatesByPriority(
       activePlayers.filter((p) => p.gender === 'F' && !assignedPlayerIds.has(p.id)),
       statsMap,
-      nextRoundNumber + 300,
+      effectiveSeed + 300,
       'MIXED'
     );
 
@@ -809,7 +1196,7 @@ export function generateNextRound(
       availMen,
       availWomen,
       statsMap,
-      nextRoundNumber
+      effectiveSeed
     );
 
     results.forEach((res, idx) => {
@@ -838,14 +1225,14 @@ export function generateNextRound(
     const availAny = sortCandidatesByPriority(
       activePlayers.filter((p) => !assignedPlayerIds.has(p.id)),
       statsMap,
-      nextRoundNumber + 400
+      effectiveSeed + 400
     );
     const maxCourts = Math.min(openCourts.length, Math.floor(availAny.length / 4));
     const results = optimizeSamePoolCourts(
       maxCourts,
       availAny,
       statsMap,
-      nextRoundNumber + 400
+      effectiveSeed + 400
     );
     results.forEach((res, idx) => {
       const court = openCourts[idx];
@@ -875,7 +1262,7 @@ export function generateNextRound(
     const availRemaining = sortCandidatesByPriority(
       activePlayers.filter((p) => !assignedPlayerIds.has(p.id)),
       statsMap,
-      nextRoundNumber + 500
+      effectiveSeed + 500
     );
     const maxFallback = Math.min(
       unfilledCourts.length,
@@ -886,7 +1273,7 @@ export function generateNextRound(
         maxFallback,
         availRemaining,
         statsMap,
-        nextRoundNumber + 500
+        effectiveSeed + 500
       );
       results.forEach((res, idx) => {
         const court = unfilledCourts[idx];
@@ -926,7 +1313,7 @@ export function generateNextRound(
   const benchPlayerIds = sortCandidatesByPriority(
     activePlayers.filter((p) => !assignedPlayerIds.has(p.id)),
     statsMap,
-    nextRoundNumber
+    effectiveSeed
   ).map((p) => p.id);
 
   return {
@@ -941,23 +1328,18 @@ export function generateNextRound(
   };
 }
 
-/**
- * Generates a two-phase Open Play schedule where:
- * - Phase 1 (Gender Doubles): Every active player plays `genderGamesPerPlayer` (default 4) Gender Doubles games.
- * - Phase 2 (Mixed Doubles): Every active player plays `mixedGamesPerPlayer` (default 1) Mixed Doubles game.
- */
-export function generateTwoPhaseSchedule(
+function generateSingleTwoPhaseAttempt(
   players: Player[],
-  genderGamesPerPlayer = 4,
-  mixedGamesPerPlayer = 1,
-  courtCount = 4,
-  menCourtsInPhase1 = 2
+  genderGamesPerPlayer: number,
+  mixedGamesPerPlayer: number,
+  courtCount: number,
+  menCourtsInPhase1: number,
+  seedBonus: number
 ): Round[] {
   const rounds: Round[] = [];
   const activeMenCount = players.filter((p) => p.active && p.gender === 'M').length;
   const activeWomenCount = players.filter((p) => p.active && p.gender === 'F').length;
 
-  // Phase 1: Gender Doubles — schedule exact matches so every Man and every Woman plays `genderGamesPerPlayer` (e.g. 4) games
   let menMatchesRemaining =
     activeMenCount >= 4
       ? Math.ceil((activeMenCount * genderGamesPerPlayer) / 4)
@@ -1016,14 +1398,19 @@ export function generateTwoPhaseSchedule(
       });
     }
 
-    const nextR = generateNextRound(players, rounds, roundCourts, 'GENDER_SPLIT');
+    const nextR = generateNextRound(
+      players,
+      rounds,
+      roundCourts,
+      'GENDER_SPLIT',
+      seedBonus
+    );
     rounds.push(nextR);
 
     menMatchesRemaining -= mCourts;
     womenMatchesRemaining -= wCourts;
   }
 
-  // Fallback if fewer than 4 Men and fewer than 4 Women exist
   if (rounds.length === 0 && activeMenCount + activeWomenCount >= 4) {
     const totalPlayers = activeMenCount + activeWomenCount;
     let openMatchesRemaining = Math.ceil(
@@ -1044,13 +1431,18 @@ export function generateTwoPhaseSchedule(
           mode: 'OPEN_DOUBLES',
         })
       );
-      const nextR = generateNextRound(players, rounds, roundCourts, 'GENDER_SPLIT');
+      const nextR = generateNextRound(
+        players,
+        rounds,
+        roundCourts,
+        'GENDER_SPLIT',
+        seedBonus
+      );
       rounds.push(nextR);
       openMatchesRemaining -= openThisRound;
     }
   }
 
-  // Phase 2: Mixed Doubles — every player plays `mixedGamesPerPlayer` (default 1) Mixed Doubles game
   if (mixedGamesPerPlayer > 0 && activeMenCount >= 2 && activeWomenCount >= 2) {
     let mixedMatchesRemaining = Math.max(
       Math.ceil((activeMenCount * mixedGamesPerPlayer) / 2),
@@ -1082,7 +1474,8 @@ export function generateTwoPhaseSchedule(
         players,
         rounds,
         phase2Courts,
-        'MIXED_DOUBLES'
+        'MIXED_DOUBLES',
+        seedBonus
       );
       rounds.push(nextR);
       mixedMatchesRemaining -= mixedThisRound;
@@ -1090,6 +1483,54 @@ export function generateTwoPhaseSchedule(
   }
 
   return rounds;
+}
+
+export function countScheduleRepeatMeetings(rounds: Round[]): number {
+  let totalRepeats = 0;
+  for (const r of rounds) {
+    for (const m of [...(r.archivedMatches || []), ...r.matches]) {
+      totalRepeats += (m.repeatPartners || 0) + (m.repeatOpponents || 0);
+    }
+  }
+  return totalRepeats;
+}
+
+/**
+ * Generates a two-phase Open Play schedule where:
+ * - Phase 1 (Gender Doubles): Every active player plays `genderGamesPerPlayer` (default 4) Gender Doubles games.
+ * - Phase 2 (Mixed Doubles): Every active player plays `mixedGamesPerPlayer` (default 1) Mixed Doubles game.
+ * - Strict Rule: No player meets the same person again (0 repeat partners and 0 repeat opponents).
+ */
+export function generateTwoPhaseSchedule(
+  players: Player[],
+  genderGamesPerPlayer = 4,
+  mixedGamesPerPlayer = 1,
+  courtCount = 4,
+  menCourtsInPhase1 = 2
+): Round[] {
+  let bestRounds: Round[] = [];
+  let bestRepeats = Number.POSITIVE_INFINITY;
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const candidate = generateSingleTwoPhaseAttempt(
+      players,
+      genderGamesPerPlayer,
+      mixedGamesPerPlayer,
+      courtCount,
+      menCourtsInPhase1,
+      attempt
+    );
+    const repeats = countScheduleRepeatMeetings(candidate);
+    if (repeats < bestRepeats) {
+      bestRepeats = repeats;
+      bestRounds = candidate;
+    }
+    if (repeats === 0) {
+      break;
+    }
+  }
+
+  return bestRounds;
 }
 
 /**
