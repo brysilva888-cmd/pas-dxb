@@ -1522,36 +1522,43 @@ export default function App() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowOverviewDashboard((prev) => !prev)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-              showOverviewDashboard
-                ? 'bg-[#F5F6F3] hover:bg-[#EAECE6] text-[#111312] border border-[#E6EAE4]'
-                : 'bg-[#98F64F] hover:bg-[#88E63E] text-[#111312]'
-            }`}
-          >
-            {showOverviewDashboard ? (
-              <>
-                <EyeOff className="w-3.5 h-3.5" />
-                <span>Hide Overview</span>
-                <ChevronUp className="w-3.5 h-3.5" />
-              </>
-            ) : (
-              <>
-                <Eye className="w-3.5 h-3.5" />
-                <span>Unhide Overview</span>
-                <ChevronDown className="w-3.5 h-3.5" />
-              </>
-            )}
-          </button>
+          {activeTab !== 'roster' && activeTab !== 'matrix' && (
+            <button
+              type="button"
+              onClick={() => setShowOverviewDashboard((prev) => !prev)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                showOverviewDashboard
+                  ? 'bg-[#F5F6F3] hover:bg-[#EAECE6] text-[#111312] border border-[#E6EAE4]'
+                  : 'bg-[#98F64F] hover:bg-[#88E63E] text-[#111312]'
+              }`}
+            >
+              {showOverviewDashboard ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5" />
+                  <span>Hide Overview</span>
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Unhide Overview</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
+          )}
         </div>
 
-        {/* Two-Column Asymmetric Dashboard Hero (Matching Reference Graphic) */}
-        {showOverviewDashboard && (
+        {/* Two-Column Asymmetric Dashboard Hero (Hidden on Player Roster & Matchup Matrix Pages) */}
+        {showOverviewDashboard && activeTab !== 'roster' && activeTab !== 'matrix' && (
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-          {/* Left Column: 3-Step Progression Timeline + Colored Division Counters + Hatched Overview Card */}
-          <div className="lg:col-span-7 bg-white border border-[#E6EAE4] rounded-2xl p-5 flex flex-col gap-4">
+          {/* Left Column: 3-Step Progression Timeline + Colored Division Counters + Hatched Overview Card (Hidden on Score Page, Full Width on Full Schedule Page) */}
+          {activeTab !== 'scores' && (
+          <div
+            className={`${
+              activeTab === 'schedule' ? 'lg:col-span-12' : 'lg:col-span-7'
+            } bg-white border border-[#E6EAE4] rounded-2xl p-5 flex flex-col gap-4`}
+          >
             {/* Step 1-3 Progression Timeline (solid black checkmark icons + dashed connector lines) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-4 border-b border-[#E6EAE4]">
               <div className="flex items-start gap-3">
@@ -1749,141 +1756,11 @@ export default function App() {
                   </button>
                 </div>
               </div>
-
-              {/* Signature Spectrum Diagonal Hatched Bar */}
-              <div className="w-full h-4 bg-[#E9ECE6] rounded-md overflow-hidden p-0.5">
-                <div
-                  className="h-full spectrum-hatch-bar rounded-sm transition-opacity"
-                  style={{
-                    width: `${Math.max(
-                      12,
-                      Math.round((activeRoundNumber / Math.max(1, rounds.length)) * 100)
-                    )}%`,
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <div>
-                  <div className="text-xs text-slate-500">
-                    Completed Games / Player
-                  </div>
-                  <div className="text-lg font-bold font-mono tabular-nums text-[#111312]">
-                    {minGamesPlayed} – {maxGamesPlayed}{' '}
-                    <span className="text-xs font-normal text-slate-500">
-                      of {genderGamesTarget + mixedGamesTarget} target
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500">
-                    Recorded Match Scores
-                  </div>
-                  <div className="text-lg font-bold font-mono tabular-nums text-[#111312]">
-                    {completedMatchesTotal} / {totalScheduledMatches}
-                  </div>
-                </div>
-              </div>
-
-              {/* All Players Played Rotation Indicator Banner inside Overview */}
-              <div
-                className={`rounded-xl px-3.5 py-2.5 border flex flex-wrap items-center justify-between gap-2 text-xs ${
-                  allPlayersFinishedTarget
-                    ? 'bg-[#111312] border-[#F7D348] text-white'
-                    : allPlayersCompletedAtLeastOne
-                    ? 'bg-[#EFFCE6] border-[#65C71C] text-[#111312]'
-                    : allPlayersOnCourtUpToRound
-                    ? 'bg-[#F3FDE8] border-[#98F64F] text-[#111312]'
-                    : 'bg-white border-[#E6EAE4] text-[#111312]'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                      allPlayersCompletedAtLeastOne || allPlayersOnCourtUpToRound
-                        ? 'bg-[#98F64F] text-[#111312]'
-                        : 'bg-[#F7D348] text-[#111312]'
-                    }`}
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                  </span>
-                  <span className="font-bold">
-                    {allPlayersFinishedTarget
-                      ? `All ${activePlayersCount} Players Completed All ${
-                          genderGamesTarget + mixedGamesTarget
-                        } Target Games!`
-                      : allPlayersCompletedAtLeastOne
-                      ? `All ${activePlayersCount} Active Players Have Played at Least 1 Completed Game!`
-                      : allPlayersOnCourtUpToRound
-                      ? `All ${activePlayersCount} Active Players Have Stepped On Court by Round ${activeRoundNumber}!`
-                      : `Player Rotation Progress: ${playersOnCourtUpToRoundCount} of ${activePlayersCount} Players Have Been On Court`}
-                  </span>
-                </div>
-                <span
-                  className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] whitespace-nowrap ${
-                    allPlayersFinishedTarget
-                      ? 'bg-[#F7D348] text-[#111312]'
-                      : allPlayersCompletedAtLeastOne || allPlayersOnCourtUpToRound
-                      ? 'bg-[#111312] text-[#98F64F]'
-                      : 'bg-[#FFF8DE] text-[#5C4500] border border-[#F7D348]'
-                  }`}
-                >
-                  {allPlayersCompletedAtLeastOne
-                    ? `100% Played (${playersCompletedTargetCount}/${activePlayersCount} at ${
-                        genderGamesTarget + mixedGamesTarget
-                      } GP)`
-                    : allPlayersOnCourtUpToRound
-                    ? `100% On Court · ${playersWithCompletedGameCount}/${activePlayersCount} Scored`
-                    : `${
-                        activePlayersCount - playersOnCourtUpToRoundCount
-                      } Waiting for 1st Game`}
-                </span>
-              </div>
             </div>
 
-            {/* Round Timeline Pills & Court Presets */}
-            <div className="bg-[#F8F9F6] border border-[#E6EAE4] rounded-xl p-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#111312]">
-                  Session Rounds ({rounds.length} Total)
-                </span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-slate-500 flex items-center gap-1 mr-1">
-                    <Shuffle className="w-3.5 h-3.5" />
-                    <span>Courts:</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyRoundPreset('SPLIT_MW')}
-                    className="px-2.5 py-1 text-xs font-medium text-[#111312] bg-white border border-[#E6EAE4] rounded-lg hover:bg-[#ECEFE9] transition-colors whitespace-nowrap shrink-0"
-                  >
-                    Split Men &amp; Women
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyRoundPreset('ALL_M')}
-                    className="px-2.5 py-1 text-xs font-medium text-[#111312] bg-white border border-[#E6EAE4] rounded-lg hover:bg-[#ECEFE9] transition-colors whitespace-nowrap shrink-0"
-                  >
-                    All Men
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyRoundPreset('ALL_W')}
-                    className="px-2.5 py-1 text-xs font-medium text-[#111312] bg-white border border-[#E6EAE4] rounded-lg hover:bg-[#ECEFE9] transition-colors whitespace-nowrap shrink-0"
-                  >
-                    All Women
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyRoundPreset('ALL_MIXED')}
-                    className="px-2.5 py-1 text-xs font-semibold text-[#111312] bg-[#98F64F] rounded-lg hover:bg-[#88E63E] transition-colors whitespace-nowrap shrink-0"
-                  >
-                    All Mixed
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-1.5">
+            {/* Round Timeline Pills */}
+            <div className="bg-[#F8F9F6] border border-[#E6EAE4] rounded-xl p-5 flex-1 flex flex-col">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-1 auto-rows-fr">
                 {rounds.map((r) => {
                   const isSelected = r.roundNumber === activeRoundNumber;
                   const isMixed = r.phase === 'MIXED_DOUBLES';
@@ -1895,12 +1772,12 @@ export default function App() {
                         setSelectedSwapPlayerId(null);
                         setActiveRoundNumber(r.roundNumber);
                       }}
-                      className={`px-2.5 py-1.5 text-xs font-mono tabular-nums rounded-lg border transition-colors whitespace-nowrap shrink-0 ${
+                      className={`px-3.5 py-3 min-h-[46px] text-sm font-mono tabular-nums rounded-xl border transition-colors whitespace-nowrap flex items-center justify-center ${
                         isSelected
-                          ? 'bg-[#111312] text-white border-[#111312] font-semibold'
+                          ? 'bg-[#111312] text-white border-[#111312] font-bold shadow-sm'
                           : isMixed
-                          ? 'bg-[#EFFCE6] text-[#1E5E08] border-[#BCEE94] hover:bg-[#E2FAD1]'
-                          : 'bg-white text-slate-700 border-[#E6EAE4] hover:bg-[#ECEFE9]'
+                          ? 'bg-[#EFFCE6] text-[#1E5E08] border-[#BCEE94] hover:bg-[#E2FAD1] font-semibold'
+                          : 'bg-white text-slate-800 border-[#E6EAE4] hover:bg-[#ECEFE9] font-medium'
                       }`}
                     >
                       R{r.roundNumber} · {isMixed ? 'Mixed' : 'Gender'}
@@ -1910,15 +1787,16 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleAppendRound('MIXED_DOUBLES', true)}
-                  className="px-2.5 py-1.5 text-xs font-semibold text-[#111312] bg-[#98F64F] rounded-lg hover:bg-[#88E63E] transition-colors whitespace-nowrap shrink-0 flex items-center gap-1"
+                  className="col-span-2 sm:col-span-4 px-4 py-3 min-h-[46px] text-sm font-bold text-[#111312] bg-[#98F64F] rounded-xl hover:bg-[#88E63E] transition-colors whitespace-nowrap flex items-center justify-center gap-1.5"
                 >
-                  <Plus className="w-3 h-3" />
+                  <Plus className="w-4 h-4" />
                   <span>New Mixed Round</span>
                 </button>
               </div>
             </div>
 
-            {/* Active Round Courts Snapshot Grid (Fills Left Card Cleanly Without Empty Gaps) */}
+            {/* Active Round Courts Snapshot Grid (Hidden on Live Courts & Full Schedule Pages) */}
+            {activeTab !== 'courts' && activeTab !== 'schedule' && (
             <div className="bg-[#F8F9F6] border border-[#E6EAE4] rounded-xl p-4 flex-1 flex flex-col justify-start gap-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-bold uppercase tracking-wider text-[#111312]">
@@ -1990,12 +1868,22 @@ export default function App() {
                 })}
               </div>
             </div>
+            )}
           </div>
+          )}
 
-          {/* Right Column: Mint Spotlight Panel with Semi-Circular Gauge + 6-Card Metric Grid (Matching Reference Graphic) */}
-          <div className="lg:col-span-5 mint-spotlight-panel border border-[#DCEAD9] rounded-2xl p-5 flex flex-col justify-between gap-4">
-            {/* Top Center Greeting & Semi-Circular Gauge */}
-            <div className="text-center space-y-2">
+          {/* Right Column: Mint Spotlight Panel with Semi-Circular Gauge + Crown Champions + 6-Card Metric Grid (Hidden on Full Schedule Page, Full Width on Score Page) */}
+          {activeTab !== 'schedule' && (
+          <div
+            className={`${
+              activeTab === 'scores'
+                ? 'lg:col-span-12 p-6 sm:p-8 gap-6'
+                : 'lg:col-span-5 p-5 gap-4'
+            } mint-spotlight-panel border border-[#DCEAD9] rounded-2xl flex flex-col justify-between`}
+          >
+            {/* Top Center Greeting & Semi-Circular Gauge (Hidden on Score Page) */}
+            {activeTab !== 'scores' && (
+            <div className="text-center space-y-2.5">
               <div className="text-xs font-mono uppercase tracking-wider text-slate-600">
                 PICKLE &amp; SMASH DXB · Round {activeRoundNumber}
               </div>
@@ -2003,7 +1891,7 @@ export default function App() {
                 Here is your live court rotation rate
               </h1>
 
-              {/* 3-Mode Switcher (like TransUnion | Equifax | Experian in reference) */}
+              {/* 3-Mode Switcher */}
               <div className="inline-flex items-center gap-1 p-1 bg-white/80 border border-[#DCEAD9] rounded-xl mt-1">
                 <button
                   type="button"
@@ -2030,11 +1918,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('scores')}
-                  className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 ${
-                    activeTab === 'scores'
-                      ? 'bg-white text-[#111312] shadow-xs font-semibold'
-                      : 'text-slate-600 hover:text-[#111312]'
-                  }`}
+                  className="px-3 py-1 text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 text-slate-600 hover:text-[#111312]"
                 >
                   Standings
                 </button>
@@ -2169,20 +2053,37 @@ export default function App() {
                 </button>
               </div>
             </div>
+            )}
 
             {/* Crown Champions (Individual Men & Women Highest Score) + Mixed Doubles Highest Score */}
-            <div className="bg-[#111312] border-2 border-[#F7D348] rounded-2xl p-4 shadow-md space-y-3">
+            <div
+              className={`bg-[#111312] border-2 border-[#F7D348] rounded-2xl ${
+                activeTab === 'scores' ? 'p-5 sm:p-6 space-y-4' : 'p-4 space-y-3'
+              } shadow-md`}
+            >
               <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#F7D348]">
-                  <span className="w-6 h-6 rounded-lg bg-[#F7D348] text-[#111312] flex items-center justify-center shrink-0">
-                    <Crown className="w-3.5 h-3.5 fill-[#111312] text-[#111312]" />
+                <div
+                  className={`flex items-center gap-2 ${
+                    activeTab === 'scores' ? 'text-sm sm:text-base' : 'text-xs'
+                  } font-extrabold uppercase tracking-wider text-[#F7D348]`}
+                >
+                  <span
+                    className={`${
+                      activeTab === 'scores' ? 'w-7 h-7' : 'w-6 h-6'
+                    } rounded-lg bg-[#F7D348] text-[#111312] flex items-center justify-center shrink-0`}
+                  >
+                    <Crown
+                      className={`${
+                        activeTab === 'scores' ? 'w-4 h-4' : 'w-3.5 h-3.5'
+                      } fill-[#111312] text-[#111312]`}
+                    />
                   </span>
                   <span>Crown Champions · Highest Score</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActiveTab('scores')}
-                  className="px-2.5 py-1 rounded-lg bg-[#98F64F] text-[#111312] text-[11px] font-bold hover:bg-[#88E63E] transition-colors flex items-center gap-0.5"
+                  className="px-3 py-1 rounded-lg bg-[#98F64F] text-[#111312] text-xs font-bold hover:bg-[#88E63E] transition-colors flex items-center gap-0.5"
                 >
                   <span>Leaderboard</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
@@ -2190,34 +2091,58 @@ export default function App() {
               </div>
 
               {/* Individual Men & Women Highest Score Crown Champions */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div
+                className={`grid grid-cols-1 ${
+                  activeTab === 'scores' ? 'sm:grid-cols-2 gap-4' : 'sm:grid-cols-2 gap-3'
+                }`}
+              >
                 {/* Men's Crown Champion */}
                 <button
                   type="button"
                   onClick={() => setActiveTab('scores')}
-                  className="bg-gradient-to-br from-[#FFFDF4] to-[#FFF6CC] border-2 border-[#F7D348] rounded-xl p-3.5 text-left hover:brightness-102 transition-all relative overflow-hidden group shadow-xs"
+                  className={`bg-gradient-to-br from-[#FFFDF4] to-[#FFF6CC] border-2 border-[#F7D348] rounded-xl ${
+                    activeTab === 'scores' ? 'p-4 sm:p-5' : 'p-3.5'
+                  } text-left hover:brightness-102 transition-all relative overflow-hidden group shadow-xs`}
                 >
                   <div className="flex items-center justify-between gap-1.5">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#111312] text-[#F7D348] text-[10px] font-extrabold uppercase tracking-wide whitespace-nowrap shrink-0">
-                      <Crown className="w-3 h-3 fill-[#F7D348] text-[#F7D348] shrink-0" />
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#111312] text-[#F7D348] ${
+                        activeTab === 'scores' ? 'text-xs' : 'text-[10px]'
+                      } font-extrabold uppercase tracking-wide whitespace-nowrap shrink-0`}
+                    >
+                      <Crown className="w-3.5 h-3.5 fill-[#F7D348] text-[#F7D348] shrink-0" />
                       Men Champion
                     </span>
-                    <span className="text-xs font-mono tabular-nums font-extrabold px-2 py-0.5 rounded-lg bg-[#98F64F] text-[#111312] border border-[#111312]/15 whitespace-nowrap shrink-0">
+                    <span
+                      className={`${
+                        activeTab === 'scores' ? 'text-sm px-2.5 py-1' : 'text-xs px-2 py-0.5'
+                      } font-mono tabular-nums font-extrabold rounded-lg bg-[#98F64F] text-[#111312] border border-[#111312]/15 whitespace-nowrap shrink-0`}
+                    >
                       {topManChampion ? `${topManChampion.pointsFor} PTS` : '0 PTS'}
                     </span>
                   </div>
-                  <div className="mt-2 font-extrabold text-base sm:text-lg text-[#111312] truncate">
+                  <div
+                    className={`mt-2.5 font-extrabold ${
+                      activeTab === 'scores'
+                        ? 'text-xl sm:text-2xl'
+                        : 'text-base sm:text-lg'
+                    } text-[#111312] truncate`}
+                  >
                     {topManChampion && topManChampion.pointsFor > 0
                       ? topManChampion.player.name
                       : '—'}
                   </div>
-                  <div className="mt-1.5 pt-1.5 border-t border-[#F7D348]/50 flex items-center justify-between text-xs font-mono tabular-nums text-slate-700">
+                  <div
+                    className={`mt-2 pt-2 border-t border-[#F7D348]/50 flex items-center justify-between ${
+                      activeTab === 'scores' ? 'text-sm' : 'text-xs'
+                    } font-mono tabular-nums text-slate-700`}
+                  >
                     <span className="font-semibold">
                       {topManChampion
                         ? `${topManChampion.wins}W - ${topManChampion.losses}L`
                         : '0W - 0L'}
                     </span>
-                    <span className="font-extrabold text-[#111312] bg-white/80 px-1.5 py-0.5 rounded">
+                    <span className="font-extrabold text-[#111312] bg-white/80 px-2 py-0.5 rounded">
                       Diff:{' '}
                       {topManChampion
                         ? topManChampion.pointDiff > 0
@@ -2232,31 +2157,51 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('scores')}
-                  className="bg-gradient-to-br from-[#FFFDF4] to-[#FFF6CC] border-2 border-[#F7D348] rounded-xl p-3.5 text-left hover:brightness-102 transition-all relative overflow-hidden group shadow-xs"
+                  className={`bg-gradient-to-br from-[#FFFDF4] to-[#FFF6CC] border-2 border-[#F7D348] rounded-xl ${
+                    activeTab === 'scores' ? 'p-4 sm:p-5' : 'p-3.5'
+                  } text-left hover:brightness-102 transition-all relative overflow-hidden group shadow-xs`}
                 >
                   <div className="flex items-center justify-between gap-1.5">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#111312] text-[#F7D348] text-[10px] font-extrabold uppercase tracking-wide whitespace-nowrap shrink-0">
-                      <Crown className="w-3 h-3 fill-[#F7D348] text-[#F7D348] shrink-0" />
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#111312] text-[#F7D348] ${
+                        activeTab === 'scores' ? 'text-xs' : 'text-[10px]'
+                      } font-extrabold uppercase tracking-wide whitespace-nowrap shrink-0`}
+                    >
+                      <Crown className="w-3.5 h-3.5 fill-[#F7D348] text-[#F7D348] shrink-0" />
                       Women Champion
                     </span>
-                    <span className="text-xs font-mono tabular-nums font-extrabold px-2 py-0.5 rounded-lg bg-[#F7D348] text-[#111312] border border-[#111312]/15 whitespace-nowrap shrink-0">
+                    <span
+                      className={`${
+                        activeTab === 'scores' ? 'text-sm px-2.5 py-1' : 'text-xs px-2 py-0.5'
+                      } font-mono tabular-nums font-extrabold rounded-lg bg-[#F7D348] text-[#111312] border border-[#111312]/15 whitespace-nowrap shrink-0`}
+                    >
                       {topWomanChampion
                         ? `${topWomanChampion.pointsFor} PTS`
                         : '0 PTS'}
                     </span>
                   </div>
-                  <div className="mt-2 font-extrabold text-base sm:text-lg text-[#111312] truncate">
+                  <div
+                    className={`mt-2.5 font-extrabold ${
+                      activeTab === 'scores'
+                        ? 'text-xl sm:text-2xl'
+                        : 'text-base sm:text-lg'
+                    } text-[#111312] truncate`}
+                  >
                     {topWomanChampion && topWomanChampion.pointsFor > 0
                       ? topWomanChampion.player.name
                       : '—'}
                   </div>
-                  <div className="mt-1.5 pt-1.5 border-t border-[#F7D348]/50 flex items-center justify-between text-xs font-mono tabular-nums text-slate-700">
+                  <div
+                    className={`mt-2 pt-2 border-t border-[#F7D348]/50 flex items-center justify-between ${
+                      activeTab === 'scores' ? 'text-sm' : 'text-xs'
+                    } font-mono tabular-nums text-slate-700`}
+                  >
                     <span className="font-semibold">
                       {topWomanChampion
                         ? `${topWomanChampion.wins}W - ${topWomanChampion.losses}L`
                         : '0W - 0L'}
                     </span>
-                    <span className="font-extrabold text-[#111312] bg-white/80 px-1.5 py-0.5 rounded">
+                    <span className="font-extrabold text-[#111312] bg-white/80 px-2 py-0.5 rounded">
                       Diff:{' '}
                       {topWomanChampion
                         ? topWomanChampion.pointDiff > 0
@@ -2272,24 +2217,44 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('scores')}
-                className="w-full bg-gradient-to-r from-[#F3FDE8] to-[#E2FBC7] border-2 border-[#98F64F] rounded-xl p-3.5 text-left hover:brightness-102 transition-all shadow-xs"
+                className={`w-full bg-gradient-to-r from-[#F3FDE8] to-[#E2FBC7] border-2 border-[#98F64F] rounded-xl ${
+                  activeTab === 'scores' ? 'p-4 sm:p-5' : 'p-3.5'
+                } text-left hover:brightness-102 transition-all shadow-xs`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#111312] text-[#98F64F] text-[10px] font-extrabold uppercase tracking-wide">
-                    <Trophy className="w-3 h-3 text-[#98F64F]" />
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#111312] text-[#98F64F] ${
+                      activeTab === 'scores' ? 'text-xs' : 'text-[10px]'
+                    } font-extrabold uppercase tracking-wide`}
+                  >
+                    <Trophy className="w-3.5 h-3.5 text-[#98F64F]" />
                     Mixed Double Champion
                   </span>
-                  <span className="text-sm font-mono tabular-nums font-extrabold px-2.5 py-0.5 rounded-lg bg-[#98F64F] text-[#111312] border border-[#111312]/15">
+                  <span
+                    className={`${
+                      activeTab === 'scores' ? 'text-sm sm:text-base px-3 py-1' : 'text-sm px-2.5 py-0.5'
+                    } font-mono tabular-nums font-extrabold rounded-lg bg-[#98F64F] text-[#111312] border border-[#111312]/15`}
+                  >
                     {topMixedPair ? `${topMixedPair.pointsFor} PTS` : '0 PTS'}
                   </span>
                 </div>
-                <div className="mt-2 flex items-baseline justify-between gap-2">
-                  <div className="font-extrabold text-base sm:text-lg text-[#111312] truncate">
+                <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                  <div
+                    className={`font-extrabold ${
+                      activeTab === 'scores'
+                        ? 'text-xl sm:text-2xl'
+                        : 'text-base sm:text-lg'
+                    } text-[#111312] truncate`}
+                  >
                     {topMixedPair && topMixedPair.pointsFor > 0
                       ? topMixedPair.pairName
                       : '—'}
                   </div>
-                  <div className="text-xs font-mono tabular-nums font-bold text-[#111312] bg-white/80 px-2 py-0.5 rounded shrink-0">
+                  <div
+                    className={`${
+                      activeTab === 'scores' ? 'text-sm px-2.5 py-1' : 'text-xs px-2 py-0.5'
+                    } font-mono tabular-nums font-bold text-[#111312] bg-white/80 rounded shrink-0`}
+                  >
                     {topMixedPair
                       ? `${topMixedPair.wins}W - ${topMixedPair.losses}L (${
                           topMixedPair.pointDiff > 0
@@ -2302,26 +2267,38 @@ export default function App() {
               </button>
             </div>
 
-            {/* 6-Card Metric Grid (2x3) Matching the Bottom-Right of the Reference Dashboard */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {/* 6-Card Metric Grid (Expands to 6 columns across full body width on Score page) */}
+            <div
+              className={`grid ${
+                activeTab === 'scores'
+                  ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5'
+                  : 'grid-cols-2 sm:grid-cols-3 gap-2.5'
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => setActiveTab('matrix')}
-                className="bg-white/95 border border-[#E2ECE0] rounded-xl p-3 text-left hover:bg-white transition-colors"
+                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                  activeTab === 'scores' ? 'p-4' : 'p-3'
+                } text-left hover:bg-white transition-colors`}
               >
-                <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
+                <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Novelty rate</span>
-                  <ArrowUpRight className="w-3 h-3 text-slate-400 shrink-0" />
+                  <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </div>
-                <div className="mt-1.5 flex items-baseline justify-between gap-1">
-                  <span className="text-lg font-bold font-mono tabular-nums text-[#111312]">
+                <div className="mt-2 flex items-baseline justify-between gap-1">
+                  <span
+                    className={`${
+                      activeTab === 'scores' ? 'text-xl sm:text-2xl' : 'text-lg'
+                    } font-bold font-mono tabular-nums text-[#111312]`}
+                  >
                     {currentRoundNovelty}%
                   </span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#98F64F] text-[#111312] whitespace-nowrap">
                     Optimal
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 truncate">
+                <p className="text-[11px] text-slate-500 mt-1 truncate">
                   Unique court pairings
                 </p>
               </button>
@@ -2329,21 +2306,27 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('schedule')}
-                className="bg-white/95 border border-[#E2ECE0] rounded-xl p-3 text-left hover:bg-white transition-colors"
+                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                  activeTab === 'scores' ? 'p-4' : 'p-3'
+                } text-left hover:bg-white transition-colors`}
               >
-                <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
+                <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Gender double</span>
-                  <ArrowUpRight className="w-3 h-3 text-slate-400 shrink-0" />
+                  <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </div>
-                <div className="mt-1.5 flex items-baseline justify-between gap-1">
-                  <span className="text-lg font-bold font-mono tabular-nums text-[#111312]">
+                <div className="mt-2 flex items-baseline justify-between gap-1">
+                  <span
+                    className={`${
+                      activeTab === 'scores' ? 'text-xl sm:text-2xl' : 'text-lg'
+                    } font-bold font-mono tabular-nums text-[#111312]`}
+                  >
                     {genderGamesTarget} GP
                   </span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#98F64F] text-[#111312] whitespace-nowrap">
                     Phase 1
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 truncate">
+                <p className="text-[11px] text-slate-500 mt-1 truncate">
                   {phase1RoundsCount} Gender rounds
                 </p>
               </button>
@@ -2351,21 +2334,27 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('schedule')}
-                className="bg-white/95 border border-[#E2ECE0] rounded-xl p-3 text-left hover:bg-white transition-colors"
+                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                  activeTab === 'scores' ? 'p-4' : 'p-3'
+                } text-left hover:bg-white transition-colors`}
               >
-                <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
+                <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Mixed double</span>
-                  <ArrowUpRight className="w-3 h-3 text-slate-400 shrink-0" />
+                  <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </div>
-                <div className="mt-1.5 flex items-baseline justify-between gap-1">
-                  <span className="text-lg font-bold font-mono tabular-nums text-[#111312]">
+                <div className="mt-2 flex items-baseline justify-between gap-1">
+                  <span
+                    className={`${
+                      activeTab === 'scores' ? 'text-xl sm:text-2xl' : 'text-lg'
+                    } font-bold font-mono tabular-nums text-[#111312]`}
+                  >
                     {mixedGamesTarget} GP
                   </span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#98F64F] text-[#111312] whitespace-nowrap">
                     Phase 2
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 truncate">
+                <p className="text-[11px] text-slate-500 mt-1 truncate">
                   {phase2RoundsCount} Mixed rounds
                 </p>
               </button>
@@ -2373,21 +2362,27 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('roster')}
-                className="bg-white/95 border border-[#E2ECE0] rounded-xl p-3 text-left hover:bg-white transition-colors"
+                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                  activeTab === 'scores' ? 'p-4' : 'p-3'
+                } text-left hover:bg-white transition-colors`}
               >
-                <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
+                <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Men roster</span>
-                  <ArrowUpRight className="w-3 h-3 text-slate-400 shrink-0" />
+                  <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </div>
-                <div className="mt-1.5 flex items-baseline justify-between gap-1">
-                  <span className="text-lg font-bold font-mono tabular-nums text-[#111312]">
+                <div className="mt-2 flex items-baseline justify-between gap-1">
+                  <span
+                    className={`${
+                      activeTab === 'scores' ? 'text-xl sm:text-2xl' : 'text-lg'
+                    } font-bold font-mono tabular-nums text-[#111312]`}
+                  >
                     {menPlayers.length}
                   </span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#D7F7B8] text-[#1E5E08] whitespace-nowrap">
                     Active
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 truncate">
+                <p className="text-[11px] text-slate-500 mt-1 truncate">
                   Checked-in Men
                 </p>
               </button>
@@ -2395,21 +2390,27 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('roster')}
-                className="bg-white/95 border border-[#E2ECE0] rounded-xl p-3 text-left hover:bg-white transition-colors"
+                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                  activeTab === 'scores' ? 'p-4' : 'p-3'
+                } text-left hover:bg-white transition-colors`}
               >
-                <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
+                <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Women roster</span>
-                  <ArrowUpRight className="w-3 h-3 text-slate-400 shrink-0" />
+                  <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </div>
-                <div className="mt-1.5 flex items-baseline justify-between gap-1">
-                  <span className="text-lg font-bold font-mono tabular-nums text-[#111312]">
+                <div className="mt-2 flex items-baseline justify-between gap-1">
+                  <span
+                    className={`${
+                      activeTab === 'scores' ? 'text-xl sm:text-2xl' : 'text-lg'
+                    } font-bold font-mono tabular-nums text-[#111312]`}
+                  >
                     {womenPlayers.length}
                   </span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#FCE592] text-[#5C4500] whitespace-nowrap">
                     Active
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 truncate">
+                <p className="text-[11px] text-slate-500 mt-1 truncate">
                   Checked-in Women
                 </p>
               </button>
@@ -2417,26 +2418,33 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('scores')}
-                className="bg-white/95 border border-[#E2ECE0] rounded-xl p-3 text-left hover:bg-white transition-colors"
+                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                  activeTab === 'scores' ? 'p-4' : 'p-3'
+                } text-left hover:bg-white transition-colors`}
               >
-                <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
+                <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Completed</span>
-                  <ArrowUpRight className="w-3 h-3 text-slate-400 shrink-0" />
+                  <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </div>
-                <div className="mt-1.5 flex items-baseline justify-between gap-1">
-                  <span className="text-lg font-bold font-mono tabular-nums text-[#111312]">
+                <div className="mt-2 flex items-baseline justify-between gap-1">
+                  <span
+                    className={`${
+                      activeTab === 'scores' ? 'text-xl sm:text-2xl' : 'text-lg'
+                    } font-bold font-mono tabular-nums text-[#111312]`}
+                  >
                     {sessionProgressPct}%
                   </span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F06449] text-white whitespace-nowrap">
                     {completedMatchesTotal} Done
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 truncate">
+                <p className="text-[11px] text-slate-500 mt-1 truncate">
                   Recorded match scores
                 </p>
               </button>
             </div>
           </div>
+          )}
         </section>
         )}
 
