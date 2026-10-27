@@ -2492,7 +2492,7 @@ export default function App() {
                       activeTab === 'scores'
                         ? 'text-xl sm:text-2xl'
                         : 'text-base sm:text-lg'
-                    } text-[#111312] truncate`}
+                    } champion-card-name text-black truncate`}
                   >
                     {topManChampion && topManChampion.pointsFor > 0
                       ? topManChampion.player.name
@@ -2503,7 +2503,7 @@ export default function App() {
                       activeTab === 'scores' ? 'text-sm' : 'text-xs'
                     } font-mono tabular-nums text-slate-700`}
                   >
-                    <span className="font-semibold">
+                    <span className="font-semibold text-black/80">
                       {topManChampion
                         ? `${topManChampion.wins}W - ${topManChampion.losses}L`
                         : '0W - 0L'}
@@ -2551,7 +2551,7 @@ export default function App() {
                       activeTab === 'scores'
                         ? 'text-xl sm:text-2xl'
                         : 'text-base sm:text-lg'
-                    } text-[#111312] truncate`}
+                    } champion-card-name text-black truncate`}
                   >
                     {topWomanChampion && topWomanChampion.pointsFor > 0
                       ? topWomanChampion.player.name
@@ -2562,7 +2562,7 @@ export default function App() {
                       activeTab === 'scores' ? 'text-sm' : 'text-xs'
                     } font-mono tabular-nums text-slate-700`}
                   >
-                    <span className="font-semibold">
+                    <span className="font-semibold text-black/80">
                       {topWomanChampion
                         ? `${topWomanChampion.wins}W - ${topWomanChampion.losses}L`
                         : '0W - 0L'}
@@ -2604,13 +2604,13 @@ export default function App() {
                     {topMixedPair ? `${topMixedPair.pointsFor} PTS` : '0 PTS'}
                   </span>
                 </div>
-                <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                <div className="mt-2.5 flex items-baseline justify-between gap-2 champion-card-name text-black">
                   <div
                     className={`font-extrabold ${
                       activeTab === 'scores'
                         ? 'text-xl sm:text-2xl'
                         : 'text-base sm:text-lg'
-                    } text-[#111312] truncate`}
+                    } champion-card-name text-black truncate`}
                   >
                     {topMixedPair && topMixedPair.pointsFor > 0
                       ? topMixedPair.pairName
@@ -2638,9 +2638,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('matrix')}
-                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                className={`bg-white border border-[#E6EAE4] rounded-xl ${
                   activeTab === 'scores' ? 'p-4' : 'p-3'
-                } text-left hover:bg-white transition-colors`}
+                } text-left hover:bg-[#F5F6F3] transition-colors`}
               >
                 <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Novelty rate</span>
@@ -2666,9 +2666,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('schedule')}
-                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                className={`bg-white border border-[#E6EAE4] rounded-xl ${
                   activeTab === 'scores' ? 'p-4' : 'p-3'
-                } text-left hover:bg-white transition-colors`}
+                } text-left hover:bg-[#F5F6F3] transition-colors`}
               >
                 <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Gender double</span>
@@ -2694,9 +2694,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('schedule')}
-                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                className={`bg-white border border-[#E6EAE4] rounded-xl ${
                   activeTab === 'scores' ? 'p-4' : 'p-3'
-                } text-left hover:bg-white transition-colors`}
+                } text-left hover:bg-[#F5F6F3] transition-colors`}
               >
                 <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Mixed double</span>
@@ -2722,9 +2722,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('roster')}
-                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                className={`bg-white border border-[#E6EAE4] rounded-xl ${
                   activeTab === 'scores' ? 'p-4' : 'p-3'
-                } text-left hover:bg-white transition-colors`}
+                } text-left hover:bg-[#F5F6F3] transition-colors`}
               >
                 <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Men roster</span>
@@ -2750,9 +2750,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('roster')}
-                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                className={`bg-white border border-[#E6EAE4] rounded-xl ${
                   activeTab === 'scores' ? 'p-4' : 'p-3'
-                } text-left hover:bg-white transition-colors`}
+                } text-left hover:bg-[#F5F6F3] transition-colors`}
               >
                 <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Women roster</span>
@@ -2778,9 +2778,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab('scores')}
-                className={`bg-white/95 border border-[#E2ECE0] rounded-xl ${
+                className={`bg-white border border-[#E6EAE4] rounded-xl ${
                   activeTab === 'scores' ? 'p-4' : 'p-3'
-                } text-left hover:bg-white transition-colors`}
+                } text-left hover:bg-[#F5F6F3] transition-colors`}
               >
                 <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span className="truncate">Completed</span>

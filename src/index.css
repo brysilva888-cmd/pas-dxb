@@ -87,7 +87,8 @@ html.dark .bg-white {
 html.dark .bg-white\/55,
 html.dark .bg-white\/70,
 html.dark .bg-white\/80,
-html.dark .bg-white\/90 {
+html.dark .bg-white\/90,
+html.dark .bg-white\/95 {
   background-color: rgba(20, 26, 23, 0.85) !important;
 }
 
@@ -97,6 +98,7 @@ html.dark .bg-\[\#111312\] {
 }
 
 html.dark .border-\[\#E6EAE4\],
+html.dark .border-\[\#E2ECE0\],
 html.dark .border-\[\#DCEAD9\],
 html.dark .border-\[\#D5DFD2\],
 html.dark .border-slate-200,
@@ -113,6 +115,11 @@ html.dark .text-slate-900,
 html.dark .text-slate-800,
 html.dark .text-slate-700 {
   color: #f3f6f4 !important;
+}
+
+.champion-card-name,
+html.dark .champion-card-name {
+  color: #000000 !important;
 }
 
 html.dark .text-slate-600,
