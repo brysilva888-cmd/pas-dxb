@@ -11,6 +11,12 @@
     font-family: var(--font-sans);
     color: #111312;
     background-color: #f5f6f3;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  html.dark body {
+    color: #f3f6f4;
+    background-color: #0b0e0d;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -27,6 +33,11 @@
 /* Signature DisputeFox-inspired surface & hatched bar styles */
 .mint-spotlight-panel {
   background: linear-gradient(155deg, #e8f5ec 0%, #eff8e7 52%, #f7faf4 100%);
+}
+
+html.dark .mint-spotlight-panel {
+  background: linear-gradient(155deg, #111d16 0%, #142219 52%, #121815 100%) !important;
+  border-color: #243529 !important;
 }
 
 .spectrum-hatch-bar {
@@ -52,3 +63,105 @@
     ),
     linear-gradient(90deg, #8ce638 0%, #98f64f 100%);
 }
+
+/* Comprehensive Dark Theme Overrides */
+html.dark .bg-\[\#F5F6F3\],
+html.dark .bg-\[\#F7F8F5\],
+html.dark .bg-\[\#F8F9F6\],
+html.dark .bg-\[\#F8FAF6\],
+html.dark .bg-slate-50 {
+  background-color: #0d110f !important;
+}
+
+html.dark .bg-\[\#ECEFE9\],
+html.dark .bg-\[\#EAECE7\],
+html.dark .bg-\[\#EAECE6\],
+html.dark .bg-slate-100 {
+  background-color: #1a221e !important;
+}
+
+html.dark .bg-white {
+  background-color: #141a17 !important;
+}
+
+html.dark .bg-white\/55,
+html.dark .bg-white\/70,
+html.dark .bg-white\/80,
+html.dark .bg-white\/90 {
+  background-color: rgba(20, 26, 23, 0.85) !important;
+}
+
+html.dark .bg-\[\#111312\] {
+  background-color: #242f2a !important;
+  border-color: #384740 !important;
+}
+
+html.dark .border-\[\#E6EAE4\],
+html.dark .border-\[\#DCEAD9\],
+html.dark .border-\[\#D5DFD2\],
+html.dark .border-slate-200,
+html.dark .border-slate-100 {
+  border-color: #25302b !important;
+}
+
+html.dark .divide-\[\#E6EAE4\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #25302b !important;
+}
+
+html.dark .text-\[\#111312\],
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700 {
+  color: #f3f6f4 !important;
+}
+
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #9ca9a3 !important;
+}
+
+html.dark .text-slate-400 {
+  color: #75857e !important;
+}
+
+/* Preserve dark text on bright lime, gold, and pastel badges in dark mode */
+html.dark .bg-\[\#98F64F\],
+html.dark .bg-\[\#98F64F\] .text-\[\#111312\],
+html.dark .bg-\[\#FCE592\],
+html.dark .bg-\[\#FCE592\] .text-\[\#111312\],
+html.dark .bg-\[\#F7D348\],
+html.dark .bg-\[\#F7D348\] .text-\[\#111312\],
+html.dark .bg-\[\#FFF8DE\],
+html.dark .bg-\[\#EFFCE6\] {
+  color: #111312 !important;
+}
+
+html.dark .bg-\[\#EFFCE6\] {
+  background-color: rgba(152, 246, 79, 0.16) !important;
+  border-color: rgba(152, 246, 79, 0.4) !important;
+  color: #b4f97d !important;
+}
+
+html.dark .bg-\[\#FFF8DE\] {
+  background-color: rgba(247, 211, 72, 0.16) !important;
+  border-color: rgba(247, 211, 72, 0.4) !important;
+  color: #fae078 !important;
+}
+
+html.dark .text-\[\#287D0C\],
+html.dark .text-\[\#1E5E08\] {
+  color: #98f64f !important;
+}
+
+html.dark svg path[stroke="#DCE6D9"] {
+  stroke: #25302b;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #0d110f;
+  color: #f3f6f4;
+  border-color: #25302b;
+}
+

@@ -20,11 +20,13 @@ import {
   LogIn,
   LogOut,
   Minus,
+  Moon,
   Pause,
   Play,
   Plus,
   RotateCcw,
   Shuffle,
+  Sun,
   Trophy,
   Upload,
 } from 'lucide-react';
@@ -156,6 +158,24 @@ export default function App() {
   const [timerRunning, setTimerRunning] = useState<boolean>(false);
   const [showOverviewDashboard, setShowOverviewDashboard] =
     useState<boolean>(true);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('pickle_smash_dxb_theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    }
+    try {
+      window.localStorage.setItem('pickle_smash_dxb_theme', theme);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [theme]);
 
   // Firebase Auth & Real-Time Firestore Session Sync State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -1552,8 +1572,37 @@ export default function App() {
             </button>
           </nav>
 
-          {/* Zone 3: Cloud Sync + PWA Install + Primary Action */}
+          {/* Zone 3: Cloud Sync + Theme Toggle + PWA Install + Primary Action */}
           <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() =>
+                setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+              }
+              className="px-3 py-2 text-xs font-semibold bg-[#F5F6F3] border border-[#E6EAE4] text-[#111312] rounded-xl hover:bg-[#ECEFE9] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              title={
+                theme === 'dark'
+                  ? 'Switch to Light Mode'
+                  : 'Switch to Dark Mode'
+              }
+              aria-label={
+                theme === 'dark'
+                  ? 'Switch to Light Mode'
+                  : 'Switch to Dark Mode'
+              }
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-[#F7D348]" />
+                  <span className="hidden sm:inline">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-slate-700" />
+                  <span className="hidden sm:inline">Dark</span>
+                </>
+              )}
+            </button>
             <PWAInstallButton />
             {currentUser ? (
               <div className="flex items-center gap-1.5 bg-[#F5F6F3] border border-[#E6EAE4] px-2.5 py-1.5 rounded-xl">
