@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { Check, Download, Plus, RotateCcw, Search, X } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Check,
+  Download,
+  Plus,
+  RotateCcw,
+  Search,
+  X,
+} from 'lucide-react';
 import { Player, PlayPhase, Round } from '../types';
 
 interface ScheduleQueueViewProps {
@@ -15,6 +23,11 @@ interface ScheduleQueueViewProps {
     scoreB: number | null,
     completed: boolean
   ) => void;
+  onSwapPlayersInRound: (
+    roundNumber: number,
+    player1Id: string,
+    player2Id: string
+  ) => void;
 }
 
 export const ScheduleQueueView: React.FC<ScheduleQueueViewProps> = ({
@@ -24,11 +37,29 @@ export const ScheduleQueueView: React.FC<ScheduleQueueViewProps> = ({
   onSelectRound,
   onAppendRound,
   onUpdateMatchScore,
+  onSwapPlayersInRound,
 }) => {
   const [phaseFilter, setPhaseFilter] = useState<
     'ALL' | 'GENDER_SPLIT' | 'MIXED_DOUBLES'
   >('ALL');
   const [playerFilter, setPlayerFilter] = useState('');
+  const [swapSelection, setSwapSelection] = useState<{
+    roundNumber: number;
+    playerId: string;
+  } | null>(null);
+
+  const handlePlayerSwapClick = (roundNumber: number, playerId: string) => {
+    if (!swapSelection || swapSelection.roundNumber !== roundNumber) {
+      setSwapSelection({ roundNumber, playerId });
+      return;
+    }
+    if (swapSelection.playerId === playerId) {
+      setSwapSelection(null);
+      return;
+    }
+    onSwapPlayersInRound(roundNumber, swapSelection.playerId, playerId);
+    setSwapSelection(null);
+  };
 
   const playerMap: Record<string, Player> = {};
   for (const p of players) {
@@ -171,7 +202,7 @@ export const ScheduleQueueView: React.FC<ScheduleQueueViewProps> = ({
               Multi-Round Open Play Schedule &amp; Match Scores
             </h2>
             <p className="text-sm text-slate-600 mt-0.5">
-              Record and review the score for each game across Phase 1 (4 Gender Doubles games/player) and Phase 2 (1 Mixed Doubles game/player).
+              Record and review the score for each game across Phase 1 (4 Gender Doubles games/player) and Phase 2 (1 Mixed Doubles game/player). Click any two players in a round (on court or bench) to swap their positions.
             </p>
           </div>
 
@@ -377,6 +408,10 @@ export const ScheduleQueueView: React.FC<ScheduleQueueViewProps> = ({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-medium text-slate-500 hidden sm:inline-flex items-center gap-1 mr-1">
+                    <ArrowLeftRight className="w-3 h-3 text-[#287D0C]" />
+                    <span>Click any 2 players to swap</span>
+                  </span>
                   {!isRoundAllCompleted && allRoundMatches.length > 0 && (
                     <button
                       type="button"
@@ -402,12 +437,31 @@ export const ScheduleQueueView: React.FC<ScheduleQueueViewProps> = ({
                 </div>
               </div>
 
+              {swapSelection?.roundNumber === round.roundNumber && (
+                <div className="mt-3 bg-[#FFF8DE] border border-[#F7D348] rounded-xl px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs text-[#111312] flex items-center gap-2">
+                    <ArrowLeftRight className="w-3.5 h-3.5 text-[#5C4500] shrink-0" />
+                    <span>
+                      <span className="font-bold">Swap Mode (Round {round.roundNumber}):</span>{' '}
+                      Selected{' '}
+                      <span className="font-mono font-bold underline">
+                        {playerMap[swapSelection.playerId]?.name}
+                      </span>
+                      . Click any other player on a court or in the resting bench below to swap positions.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSwapSelection(null)}
+                    className="px-2.5 py-1 text-xs font-semibold bg-[#111312] text-white rounded-lg hover:bg-[#272B29] whitespace-nowrap shrink-0"
+                  >
+                    Cancel Swap
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-4">
                 {allRoundMatches.map((match, matchIdx) => {
-                  const pA1 = playerMap[match.teamA[0]];
-                  const pA2 = playerMap[match.teamA[1]];
-                  const pB1 = playerMap[match.teamB[0]];
-                  const pB2 = playerMap[match.teamB[1]];
                   const sA = match.scoreA ?? 0;
                   const sB = match.scoreB ?? 0;
                   const teamAWon = match.completed && sA > sB;
@@ -415,6 +469,73 @@ export const ScheduleQueueView: React.FC<ScheduleQueueViewProps> = ({
                   const isArchivedGame =
                     (round.archivedMatches?.length || 0) > 0 &&
                     matchIdx < (round.archivedMatches?.length || 0);
+                  const isRoundSwapActive =
+                    swapSelection?.roundNumber === round.roundNumber;
+
+                  const renderSwappablePlayerButton = (
+                    pid: string,
+                    teamWon: boolean
+                  ) => {
+                    const p = playerMap[pid];
+                    const isSelected =
+                      isRoundSwapActive && swapSelection?.playerId === pid;
+                    const isHighlightedBySearch = matchesPlayerQuery(pid);
+
+                    return (
+                      <button
+                        key={pid}
+                        type="button"
+                        onClick={() =>
+                          handlePlayerSwapClick(round.roundNumber, pid)
+                        }
+                        title={
+                          isSelected
+                            ? 'Click to cancel swap'
+                            : isRoundSwapActive
+                            ? `Swap with ${
+                                playerMap[swapSelection!.playerId]?.name ||
+                                'selected player'
+                              }`
+                            : `Click to swap ${p?.name || 'player'} in Round ${
+                                round.roundNumber
+                              }`
+                        }
+                        className={`w-full px-2 py-1 rounded-lg border text-left text-xs flex items-center justify-between gap-1.5 transition-colors group ${
+                          isSelected
+                            ? 'bg-[#111312] text-white border-[#111312] font-bold shadow-xs'
+                            : isRoundSwapActive
+                            ? 'bg-[#FFFDF2] text-[#111312] border-[#F7D348] hover:bg-[#FFF3BF] font-medium'
+                            : isHighlightedBySearch || teamWon
+                            ? 'bg-white text-[#287D0C] border-[#BCEE94] hover:border-[#287D0C] font-bold'
+                            : 'bg-white text-[#111312] border-[#E6EAE4] hover:border-[#111312]/40 font-medium'
+                        }`}
+                      >
+                        <span className="truncate">{p?.name || 'TBD'}</span>
+                        <span className="flex items-center gap-1 shrink-0">
+                          <span
+                            className={`text-[10px] font-mono px-1 rounded ${
+                              isSelected
+                                ? 'bg-[#98F64F] text-[#111312] font-bold'
+                                : p?.gender === 'F'
+                                ? 'bg-[#FFF3CC] text-[#5C4500]'
+                                : 'bg-[#EEF1EC] text-slate-600'
+                            }`}
+                          >
+                            {p?.gender}
+                          </span>
+                          <ArrowLeftRight
+                            className={`w-3 h-3 transition-opacity ${
+                              isSelected
+                                ? 'text-[#98F64F] opacity-100'
+                                : isRoundSwapActive
+                                ? 'text-[#B45309] opacity-100'
+                                : 'text-slate-400 opacity-60 group-hover:opacity-100 group-hover:text-[#111312]'
+                            }`}
+                          />
+                        </span>
+                      </button>
+                    );
+                  };
 
                   return (
                     <div
@@ -449,28 +570,12 @@ export const ScheduleQueueView: React.FC<ScheduleQueueViewProps> = ({
 
                       {/* Team 1 + Score Input */}
                       <div className="flex items-center justify-between gap-2">
-                        <div className="space-y-0.5 text-xs min-w-0 flex-1">
+                        <div className="space-y-1 text-xs min-w-0 flex-1">
                           <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
                             Team 1 {teamAWon ? '· WIN' : ''}
                           </div>
-                          <div
-                            className={`truncate ${
-                              matchesPlayerQuery(match.teamA[0]) || teamAWon
-                                ? 'font-bold text-[#287D0C]'
-                                : 'text-[#111312]'
-                            }`}
-                          >
-                            {pA1?.name}
-                          </div>
-                          <div
-                            className={`truncate ${
-                              matchesPlayerQuery(match.teamA[1]) || teamAWon
-                                ? 'font-bold text-[#287D0C]'
-                                : 'text-[#111312]'
-                            }`}
-                          >
-                            {pA2?.name}
-                          </div>
+                          {renderSwappablePlayerButton(match.teamA[0], teamAWon)}
+                          {renderSwappablePlayerButton(match.teamA[1], teamAWon)}
                         </div>
 
                         <input
@@ -506,39 +611,34 @@ export const ScheduleQueueView: React.FC<ScheduleQueueViewProps> = ({
                           className={
                             match.completed
                               ? 'text-[#287D0C] font-semibold'
-                              : 'text-slate-500'
+                              : (match.repeatPartners || 0) +
+                                  (match.repeatOpponents || 0) ===
+                                0
+                              ? 'text-[#287D0C] font-semibold'
+                              : 'text-[#D84E34] font-semibold'
                           }
                         >
                           {match.completed
                             ? `Final: ${sA} - ${sB}`
-                            : `${match.noveltyScore}% New`}
+                            : (match.repeatPartners || 0) +
+                                (match.repeatOpponents || 0) ===
+                              0
+                            ? '✓ 100% First-Time'
+                            : `${
+                                (match.repeatPartners || 0) +
+                                (match.repeatOpponents || 0)
+                              } Repeat(s)`}
                         </span>
                       </div>
 
                       {/* Team 2 + Score Input */}
                       <div className="flex items-center justify-between gap-2">
-                        <div className="space-y-0.5 text-xs min-w-0 flex-1">
+                        <div className="space-y-1 text-xs min-w-0 flex-1">
                           <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
                             Team 2 {teamBWon ? '· WIN' : ''}
                           </div>
-                          <div
-                            className={`truncate ${
-                              matchesPlayerQuery(match.teamB[0]) || teamBWon
-                                ? 'font-bold text-[#287D0C]'
-                                : 'text-[#111312]'
-                            }`}
-                          >
-                            {pB1?.name}
-                          </div>
-                          <div
-                            className={`truncate ${
-                              matchesPlayerQuery(match.teamB[1]) || teamBWon
-                                ? 'font-bold text-[#287D0C]'
-                                : 'text-[#111312]'
-                            }`}
-                          >
-                            {pB2?.name}
-                          </div>
+                          {renderSwappablePlayerButton(match.teamB[0], teamBWon)}
+                          {renderSwappablePlayerButton(match.teamB[1], teamBWon)}
                         </div>
 
                         <input
@@ -632,6 +732,70 @@ export const ScheduleQueueView: React.FC<ScheduleQueueViewProps> = ({
                   );
                 })}
               </div>
+
+              {/* Swappable Resting / Bench Queue for this Round */}
+              {round.benchPlayerIds.length > 0 && (
+                <div className="mt-4 pt-3.5 border-t border-[#E6EAE4]">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Resting / Bench Queue ({round.benchPlayerIds.length}) — Click to Swap Into Court
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {round.benchPlayerIds.map((pid) => {
+                      const p = playerMap[pid];
+                      if (!p) return null;
+                      const isRoundSwapActive =
+                        swapSelection?.roundNumber === round.roundNumber;
+                      const isSelected =
+                        isRoundSwapActive && swapSelection?.playerId === pid;
+                      const isSearchMatch = matchesPlayerQuery(pid);
+
+                      return (
+                        <button
+                          key={pid}
+                          type="button"
+                          onClick={() =>
+                            handlePlayerSwapClick(round.roundNumber, pid)
+                          }
+                          title={`Click to swap ${p.name} in Round ${round.roundNumber}`}
+                          className={`px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1.5 transition-colors ${
+                            isSelected
+                              ? 'bg-[#111312] text-white border-[#111312] font-bold shadow-xs'
+                              : isRoundSwapActive
+                              ? 'bg-[#FFFDF2] text-[#111312] border-[#F7D348] hover:bg-[#FFF3BF] font-medium'
+                              : isSearchMatch
+                              ? 'bg-[#EFFCE6] text-[#1E5E08] border-[#65C71C] font-bold'
+                              : 'bg-[#F7F8F5] text-slate-700 border-[#E6EAE4] hover:border-[#111312]/40 hover:bg-white'
+                          }`}
+                        >
+                          <span>{p.name}</span>
+                          <span
+                            className={`text-[10px] font-mono px-1 rounded ${
+                              isSelected
+                                ? 'bg-[#98F64F] text-[#111312] font-bold'
+                                : p.gender === 'F'
+                                ? 'bg-[#FFF3CC] text-[#5C4500]'
+                                : 'bg-[#EAECE6] text-slate-600'
+                            }`}
+                          >
+                            {p.gender}
+                          </span>
+                          <ArrowLeftRight
+                            className={`w-3 h-3 ${
+                              isSelected
+                                ? 'text-[#98F64F]'
+                                : isRoundSwapActive
+                                ? 'text-[#B45309]'
+                                : 'text-slate-400'
+                            }`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

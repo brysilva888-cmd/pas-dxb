@@ -15,6 +15,7 @@ import {
   Crown,
   Eye,
   EyeOff,
+  GripVertical,
   Link2,
   LogIn,
   LogOut,
@@ -86,6 +87,14 @@ export default function App() {
     null
   );
   const [sessionResetKey, setSessionResetKey] = useState<number>(0);
+  const [draggedRoundIdx, setDraggedRoundIdx] = useState<number | null>(null);
+  const [dragOverRoundIdx, setDragOverRoundIdx] = useState<number | null>(null);
+  const [draggedActionPhase, setDraggedActionPhase] =
+    useState<PlayPhase | null>(null);
+  const [actionButtonsOrder, setActionButtonsOrder] = useState<PlayPhase[]>([
+    'GENDER_SPLIT',
+    'MIXED_DOUBLES',
+  ]);
 
   // Quick Add Player & Quick .txt Upload state on the Live Courts Bench panel
   const [quickAddName, setQuickAddName] = useState('');
@@ -93,8 +102,8 @@ export default function App() {
   const [quickImportBanner, setQuickImportBanner] = useState<string | null>(null);
   const quickTxtInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Round Timer State (12 minutes default open-play game timer)
-  const [timerSeconds, setTimerSeconds] = useState<number>(12 * 60);
+  // Round Timer State (10 minutes default open-play game timer)
+  const [timerSeconds, setTimerSeconds] = useState<number>(10 * 60);
   const [timerRunning, setTimerRunning] = useState<boolean>(false);
   const [showOverviewDashboard, setShowOverviewDashboard] =
     useState<boolean>(true);
@@ -732,7 +741,7 @@ export default function App() {
     if (activeRoundNumber < finalizedRounds.length) {
       setRounds(finalizedRounds);
       setActiveRoundNumber(activeRoundNumber + 1);
-      setTimerSeconds(12 * 60);
+      setTimerSeconds(10 * 60);
       setTimerRunning(false);
     } else {
       const configs: CourtConfig[] = Array.from(
@@ -751,12 +760,102 @@ export default function App() {
       );
       setRounds([...finalizedRounds, newRound]);
       setActiveRoundNumber(newRound.roundNumber);
-      setTimerSeconds(12 * 60);
+      setTimerSeconds(10 * 60);
       setTimerRunning(false);
     }
   };
 
-  const handleAppendRound = (phase: PlayPhase, jumpToNew = false) => {
+  const recalculateAndRenumberRounds = (orderedRounds: Round[]): Round[] => {
+    const result: Round[] = [];
+
+    for (let idx = 0; idx < orderedRounds.length; idx++) {
+      const r = orderedRounds[idx];
+      const newRoundNum = idx + 1;
+
+      const updatedArchived = r.archivedMatches?.map((m, mIdx) => ({
+        ...m,
+        id: `r${newRoundNum}-arch-${mIdx + 1}-c${m.courtId}`,
+      }));
+
+      const statsBeforeRound = computePlayerStats(
+        players,
+        [
+          ...result,
+          ...(updatedArchived && updatedArchived.length > 0
+            ? [
+                {
+                  ...r,
+                  roundNumber: newRoundNum,
+                  archivedMatches: updatedArchived,
+                  matches: [],
+                },
+              ]
+            : []),
+        ],
+        newRoundNum
+      );
+
+      const updatedMatches = r.matches.map((m) => {
+        const evalRes = evaluateMatchCost(m.teamA, m.teamB, statsBeforeRound);
+        return {
+          ...m,
+          id: `r${newRoundNum}-c${m.courtId}`,
+          noveltyScore: evalRes.noveltyScore,
+          repeatPartners: evalRes.repeatPartners,
+          repeatOpponents: evalRes.repeatOpponents,
+        };
+      });
+
+      result.push({
+        ...r,
+        roundNumber: newRoundNum,
+        archivedMatches: updatedArchived,
+        matches: updatedMatches,
+      });
+    }
+
+    return result;
+  };
+
+  const handleReorderRound = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= rounds.length ||
+      toIndex >= rounds.length
+    ) {
+      return;
+    }
+
+    const nextList = [...rounds];
+    const [movedRound] = nextList.splice(fromIndex, 1);
+    nextList.splice(toIndex, 0, movedRound);
+
+    const renumbered = recalculateAndRenumberRounds(nextList);
+    setRounds(renumbered);
+    setSelectedSwapPlayerId(null);
+
+    if (activeRoundNumber === fromIndex + 1) {
+      setActiveRoundNumber(toIndex + 1);
+    } else if (
+      fromIndex < activeRoundNumber - 1 &&
+      toIndex >= activeRoundNumber - 1
+    ) {
+      setActiveRoundNumber((prev) => Math.max(1, prev - 1));
+    } else if (
+      fromIndex > activeRoundNumber - 1 &&
+      toIndex <= activeRoundNumber - 1
+    ) {
+      setActiveRoundNumber((prev) => Math.min(renumbered.length, prev + 1));
+    }
+  };
+
+  const handleAppendRound = (
+    phase: PlayPhase,
+    jumpToNew = false,
+    insertAtIndex?: number
+  ) => {
     const configs: CourtConfig[] = Array.from({ length: courtCount }, (_, idx) => ({
       id: idx + 1,
       name: `Court ${idx + 1}`,
@@ -768,12 +867,21 @@ export default function App() {
           : 'WOMENS_DOUBLES',
     }));
 
-    const newRound = generateNextRound(players, rounds, configs, phase);
-    const updated = [...rounds, newRound];
+    const targetIndex =
+      typeof insertAtIndex === 'number'
+        ? Math.max(0, Math.min(rounds.length, insertAtIndex))
+        : rounds.length;
+
+    const priorRounds = rounds.slice(0, targetIndex);
+    const newRound = generateNextRound(players, priorRounds, configs, phase);
+    const nextList = [...rounds];
+    nextList.splice(targetIndex, 0, newRound);
+
+    const updated = recalculateAndRenumberRounds(nextList);
     setRounds(updated);
     if (jumpToNew) {
-      setActiveRoundNumber(newRound.roundNumber);
-      setTimerSeconds(12 * 60);
+      setActiveRoundNumber(targetIndex + 1);
+      setTimerSeconds(10 * 60);
       setTimerRunning(false);
     }
   };
@@ -871,60 +979,60 @@ export default function App() {
     );
   };
 
-  const handleSelectSwapPlayer = (targetPlayerId: string) => {
-    if (!selectedSwapPlayerId) {
-      setSelectedSwapPlayerId(targetPlayerId);
-      return;
-    }
-    if (selectedSwapPlayerId === targetPlayerId) {
-      setSelectedSwapPlayerId(null);
-      return;
-    }
-
-    const p1 = selectedSwapPlayerId;
-    const p2 = targetPlayerId;
+  const handleSwapPlayersInRound = (
+    targetRoundNumber: number,
+    p1: string,
+    p2: string
+  ) => {
+    if (!p1 || !p2 || p1 === p2) return;
 
     setRounds((prevRounds) => {
-      const priorStatsMap = computePlayerStats(
-        players,
-        prevRounds,
-        activeRoundNumber - 1
-      );
+      const swapId = (id: string) => {
+        if (id === p1) return p2;
+        if (id === p2) return p1;
+        return id;
+      };
 
-      return prevRounds.map((round) => {
-        if (round.roundNumber !== activeRoundNumber) return round;
+      const nextRounds: Round[] = [];
 
-        // Also include any archived matches already finished in this round
-        const statsWithArchive = round.archivedMatches?.length
-          ? computePlayerStats(
-              players,
-              [
-                ...prevRounds.filter((r) => r.roundNumber < activeRoundNumber),
-                { ...round, matches: [] },
-              ],
-              activeRoundNumber
-            )
-          : priorStatsMap;
+      for (const round of prevRounds) {
+        if (round.roundNumber < targetRoundNumber) {
+          nextRounds.push(round);
+          continue;
+        }
 
-        const swapId = (id: string) => {
-          if (id === p1) return p2;
-          if (id === p2) return p1;
-          return id;
-        };
+        const isSwappedRound = round.roundNumber === targetRoundNumber;
+
+        const nextArchived = isSwappedRound
+          ? round.archivedMatches?.map((m) => ({
+              ...m,
+              teamA: [swapId(m.teamA[0]), swapId(m.teamA[1])] as [string, string],
+              teamB: [swapId(m.teamB[0]), swapId(m.teamB[1])] as [string, string],
+            }))
+          : round.archivedMatches;
+
+        const statsBeforeMatches = computePlayerStats(
+          players,
+          [
+            ...nextRounds,
+            ...(nextArchived && nextArchived.length > 0
+              ? [{ ...round, archivedMatches: nextArchived, matches: [] }]
+              : []),
+          ],
+          round.roundNumber
+        );
 
         const updatedMatches = round.matches.map((m) => {
-          const nextTeamA: [string, string] = [
-            swapId(m.teamA[0]),
-            swapId(m.teamA[1]),
-          ];
-          const nextTeamB: [string, string] = [
-            swapId(m.teamB[0]),
-            swapId(m.teamB[1]),
-          ];
+          const nextTeamA: [string, string] = isSwappedRound
+            ? [swapId(m.teamA[0]), swapId(m.teamA[1])]
+            : m.teamA;
+          const nextTeamB: [string, string] = isSwappedRound
+            ? [swapId(m.teamB[0]), swapId(m.teamB[1])]
+            : m.teamB;
           const evalRes = evaluateMatchCost(
             nextTeamA,
             nextTeamB,
-            statsWithArchive
+            statsBeforeMatches
           );
           return {
             ...m,
@@ -936,16 +1044,37 @@ export default function App() {
           };
         });
 
-        const updatedBench = round.benchPlayerIds.map((id) => swapId(id));
+        const updatedBench = isSwappedRound
+          ? round.benchPlayerIds.map((id) => swapId(id))
+          : round.benchPlayerIds;
 
-        return {
+        nextRounds.push({
           ...round,
+          archivedMatches: nextArchived,
           matches: updatedMatches,
           benchPlayerIds: updatedBench,
-        };
-      });
-    });
+        });
+      }
 
+      return nextRounds;
+    });
+  };
+
+  const handleSelectSwapPlayer = (targetPlayerId: string) => {
+    if (!selectedSwapPlayerId) {
+      setSelectedSwapPlayerId(targetPlayerId);
+      return;
+    }
+    if (selectedSwapPlayerId === targetPlayerId) {
+      setSelectedSwapPlayerId(null);
+      return;
+    }
+
+    handleSwapPlayersInRound(
+      activeRoundNumber,
+      selectedSwapPlayerId,
+      targetPlayerId
+    );
     setSelectedSwapPlayerId(null);
   };
 
@@ -1082,7 +1211,7 @@ export default function App() {
     // Completely reset all session state, scores, stats, round number, and timer
     setSelectedSwapPlayerId(null);
     setTimerRunning(false);
-    setTimerSeconds(12 * 60);
+    setTimerSeconds(10 * 60);
     setQuickAddName('');
     setPlayers(finalRoster);
     setCourtCount(resetCourtCount);
@@ -1181,7 +1310,7 @@ export default function App() {
   const handleClearAllPlayers = () => {
     setSelectedSwapPlayerId(null);
     setTimerRunning(false);
-    setTimerSeconds(12 * 60);
+    setTimerSeconds(10 * 60);
     setPlayers([]);
     setRounds([
       {
@@ -1202,7 +1331,7 @@ export default function App() {
   const handleResetRoundsKeepRoster = () => {
     setSelectedSwapPlayerId(null);
     setTimerRunning(false);
-    setTimerSeconds(12 * 60);
+    setTimerSeconds(10 * 60);
     const freshSchedule = generateTwoPhaseSchedule(
       players,
       genderGamesTarget,
@@ -1225,7 +1354,7 @@ export default function App() {
   ) => {
     setSelectedSwapPlayerId(null);
     setTimerRunning(false);
-    setTimerSeconds(12 * 60);
+    setTimerSeconds(10 * 60);
     const adjustedRoster = adjustRosterToCounts(
       players,
       targetMenCount,
@@ -1252,7 +1381,7 @@ export default function App() {
   const handleResetToDefaultSample = () => {
     setSelectedSwapPlayerId(null);
     setTimerRunning(false);
-    setTimerSeconds(12 * 60);
+    setTimerSeconds(10 * 60);
     const defaultRoster = createInitialRoster(25, 20);
     const defaultSchedule = generateTwoPhaseSchedule(defaultRoster, 4, 1, 4, 2);
     setPlayers(defaultRoster);
@@ -1552,13 +1681,9 @@ export default function App() {
         {/* Two-Column Asymmetric Dashboard Hero (Hidden on Player Roster & Matchup Matrix Pages) */}
         {showOverviewDashboard && activeTab !== 'roster' && activeTab !== 'matrix' && (
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-          {/* Left Column: 3-Step Progression Timeline + Colored Division Counters + Hatched Overview Card (Hidden on Score Page, Full Width on Full Schedule Page) */}
+          {/* Left Column: 3-Step Progression Timeline + Colored Division Counters + Overview Card (Hidden on Score Page) */}
           {activeTab !== 'scores' && (
-          <div
-            className={`${
-              activeTab === 'schedule' ? 'lg:col-span-12' : 'lg:col-span-7'
-            } bg-white border border-[#E6EAE4] rounded-2xl p-5 flex flex-col gap-4`}
-          >
+          <div className="lg:col-span-12 w-full bg-white border border-[#E6EAE4] rounded-2xl p-5 flex flex-col gap-4">
             {/* Step 1-3 Progression Timeline (solid black checkmark icons + dashed connector lines) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-4 border-b border-[#E6EAE4]">
               <div className="flex items-start gap-3">
@@ -1758,40 +1883,155 @@ export default function App() {
               </div>
             </div>
 
-            {/* Round Timeline Pills */}
-            <div className="bg-[#F8F9F6] border border-[#E6EAE4] rounded-xl p-5 flex-1 flex flex-col">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-1 auto-rows-fr">
-                {rounds.map((r) => {
+            {/* Round Timeline Pills (Draggable to Re-arrange) */}
+            <div className="bg-[#F8F9F6] border border-[#E6EAE4] rounded-xl p-3.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {rounds.map((r, idx) => {
                   const isSelected = r.roundNumber === activeRoundNumber;
                   const isMixed = r.phase === 'MIXED_DOUBLES';
+                  const isBeingDragged = draggedRoundIdx === idx;
+                  const isDragOver =
+                    dragOverRoundIdx === idx && draggedRoundIdx !== idx;
+
                   return (
                     <button
                       key={r.roundNumber}
                       type="button"
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedRoundIdx(idx);
+                        setDraggedActionPhase(null);
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', String(idx));
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverRoundIdx !== idx) {
+                          setDragOverRoundIdx(idx);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverRoundIdx === idx) {
+                          setDragOverRoundIdx(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedRoundIdx !== null) {
+                          handleReorderRound(draggedRoundIdx, idx);
+                        } else if (draggedActionPhase) {
+                          handleAppendRound(draggedActionPhase, true, idx);
+                        }
+                        setDraggedRoundIdx(null);
+                        setDragOverRoundIdx(null);
+                        setDraggedActionPhase(null);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedRoundIdx(null);
+                        setDragOverRoundIdx(null);
+                        setDraggedActionPhase(null);
+                      }}
                       onClick={() => {
                         setSelectedSwapPlayerId(null);
                         setActiveRoundNumber(r.roundNumber);
                       }}
-                      className={`px-3.5 py-3 min-h-[46px] text-sm font-mono tabular-nums rounded-xl border transition-colors whitespace-nowrap flex items-center justify-center ${
+                      title="Click to view round · Drag to re-arrange round order"
+                      className={`px-2.5 py-1.5 text-xs font-mono tabular-nums rounded-lg border transition-all whitespace-nowrap shrink-0 flex items-center gap-1 cursor-grab active:cursor-grabbing select-none ${
+                        isBeingDragged
+                          ? 'opacity-45 scale-95 border-dashed border-[#111312]'
+                          : isDragOver
+                          ? 'ring-2 ring-[#98F64F] border-[#111312] scale-105 z-10'
+                          : ''
+                      } ${
                         isSelected
-                          ? 'bg-[#111312] text-white border-[#111312] font-bold shadow-sm'
+                          ? 'bg-[#111312] text-white border-[#111312] font-semibold'
                           : isMixed
-                          ? 'bg-[#EFFCE6] text-[#1E5E08] border-[#BCEE94] hover:bg-[#E2FAD1] font-semibold'
-                          : 'bg-white text-slate-800 border-[#E6EAE4] hover:bg-[#ECEFE9] font-medium'
+                          ? 'bg-[#EFFCE6] text-[#1E5E08] border-[#BCEE94] hover:bg-[#E2FAD1]'
+                          : 'bg-white text-slate-700 border-[#E6EAE4] hover:bg-[#ECEFE9]'
                       }`}
                     >
-                      R{r.roundNumber} · {isMixed ? 'Mixed' : 'Gender'}
+                      <GripVertical
+                        className={`w-3 h-3 shrink-0 ${
+                          isSelected
+                            ? 'text-[#98F64F]'
+                            : isMixed
+                            ? 'text-[#287D0C]/70'
+                            : 'text-slate-400'
+                        }`}
+                      />
+                      <span>
+                        R{r.roundNumber} · {isMixed ? 'Mixed' : 'Gender'}
+                      </span>
                     </button>
                   );
                 })}
-                <button
-                  type="button"
-                  onClick={() => handleAppendRound('MIXED_DOUBLES', true)}
-                  className="col-span-2 sm:col-span-4 px-4 py-3 min-h-[46px] text-sm font-bold text-[#111312] bg-[#98F64F] rounded-xl hover:bg-[#88E63E] transition-colors whitespace-nowrap flex items-center justify-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>New Mixed Round</span>
-                </button>
+                {actionButtonsOrder.map((phase) => {
+                  const isGenderBtn = phase === 'GENDER_SPLIT';
+                  const isDraggingThisAction = draggedActionPhase === phase;
+                  return (
+                    <button
+                      key={phase}
+                      type="button"
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedActionPhase(phase);
+                        setDraggedRoundIdx(null);
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', phase);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (
+                          draggedActionPhase &&
+                          draggedActionPhase !== phase
+                        ) {
+                          setActionButtonsOrder((prev) => [...prev].reverse());
+                        } else if (draggedRoundIdx !== null) {
+                          handleReorderRound(
+                            draggedRoundIdx,
+                            rounds.length - 1
+                          );
+                        }
+                        setDraggedRoundIdx(null);
+                        setDragOverRoundIdx(null);
+                        setDraggedActionPhase(null);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedRoundIdx(null);
+                        setDragOverRoundIdx(null);
+                        setDraggedActionPhase(null);
+                      }}
+                      onClick={() => handleAppendRound(phase, true)}
+                      title="Click to add round · Drag onto any round to insert there or drag to re-arrange"
+                      className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 flex items-center gap-1 cursor-grab active:cursor-grabbing select-none ${
+                        isDraggingThisAction ? 'opacity-50 scale-95' : ''
+                      } ${
+                        isGenderBtn
+                          ? 'text-white bg-[#111312] hover:bg-[#272B29]'
+                          : 'text-[#111312] bg-[#98F64F] hover:bg-[#88E63E]'
+                      }`}
+                    >
+                      <GripVertical
+                        className={`w-3 h-3 shrink-0 ${
+                          isGenderBtn ? 'text-slate-400' : 'text-[#111312]/60'
+                        }`}
+                      />
+                      <Plus
+                        className={`w-3 h-3 ${
+                          isGenderBtn ? 'text-[#98F64F]' : 'text-[#111312]'
+                        }`}
+                      />
+                      <span>
+                        {isGenderBtn ? 'New Gender Round' : 'New Mixed Round'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1872,18 +2112,17 @@ export default function App() {
           </div>
           )}
 
-          {/* Right Column: Mint Spotlight Panel with Semi-Circular Gauge + Crown Champions + 6-Card Metric Grid (Hidden on Full Schedule Page, Full Width on Score Page) */}
-          {activeTab !== 'schedule' && (
+          {/* Mint Spotlight Panel with Semi-Circular Gauge (Left) + Crown Champions (Right) + 6-Card Metric Grid (Bottom) */}
           <div
-            className={`${
+            className={`lg:col-span-12 w-full ${
               activeTab === 'scores'
-                ? 'lg:col-span-12 p-6 sm:p-8 gap-6'
-                : 'lg:col-span-5 p-5 gap-4'
-            } mint-spotlight-panel border border-[#DCEAD9] rounded-2xl flex flex-col justify-between`}
+                ? 'p-6 sm:p-8 gap-6'
+                : 'p-5 sm:p-6 gap-5'
+            } mint-spotlight-panel border border-[#DCEAD9] rounded-2xl grid grid-cols-1 lg:grid-cols-12 items-stretch`}
           >
-            {/* Top Center Greeting & Semi-Circular Gauge (Hidden on Score Page) */}
+            {/* Left Div: Top Center Greeting & Semi-Circular Gauge (Hidden on Score Page) */}
             {activeTab !== 'scores' && (
-            <div className="text-center space-y-2.5">
+            <div className="lg:col-span-5 bg-white/55 border border-[#DCEAD9] rounded-2xl p-5 text-center flex flex-col justify-center space-y-2.5">
               <div className="text-xs font-mono uppercase tracking-wider text-slate-600">
                 PICKLE &amp; SMASH DXB · Round {activeRoundNumber}
               </div>
@@ -2044,9 +2283,9 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setTimerRunning(false);
-                    setTimerSeconds(12 * 60);
+                    setTimerSeconds(10 * 60);
                   }}
-                  title="Reset timer to 12:00"
+                  title="Reset timer to 10:00"
                   className="p-2 text-slate-700 bg-white/90 border border-[#DCEAD9] rounded-xl hover:bg-white transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -2055,11 +2294,13 @@ export default function App() {
             </div>
             )}
 
-            {/* Crown Champions (Individual Men & Women Highest Score) + Mixed Doubles Highest Score */}
+            {/* Right Div: Crown Champions (Individual Men & Women Highest Score) + Mixed Doubles Highest Score */}
             <div
-              className={`bg-[#111312] border-2 border-[#F7D348] rounded-2xl ${
-                activeTab === 'scores' ? 'p-5 sm:p-6 space-y-4' : 'p-4 space-y-3'
-              } shadow-md`}
+              className={`${
+                activeTab === 'scores'
+                  ? 'lg:col-span-12 p-5 sm:p-6 space-y-4'
+                  : 'lg:col-span-7 p-5 space-y-4 flex flex-col justify-between'
+              } bg-[#111312] border-2 border-[#F7D348] rounded-2xl shadow-md`}
             >
               <div className="flex items-center justify-between px-0.5">
                 <div
@@ -2267,14 +2508,8 @@ export default function App() {
               </button>
             </div>
 
-            {/* 6-Card Metric Grid (Expands to 6 columns across full body width on Score page) */}
-            <div
-              className={`grid ${
-                activeTab === 'scores'
-                  ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5'
-                  : 'grid-cols-2 sm:grid-cols-3 gap-2.5'
-              }`}
-            >
+            {/* 6-Card Metric Grid (Expands to 6 columns across full width) */}
+            <div className="lg:col-span-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
               <button
                 type="button"
                 onClick={() => setActiveTab('matrix')}
@@ -2444,7 +2679,6 @@ export default function App() {
               </button>
             </div>
           </div>
-          )}
         </section>
         )}
 
@@ -2777,6 +3011,7 @@ export default function App() {
             }}
             onAppendRound={(phase) => handleAppendRound(phase, false)}
             onUpdateMatchScore={handleUpdateMatchScoreAnyRound}
+            onSwapPlayersInRound={handleSwapPlayersInRound}
           />
         )}
 
