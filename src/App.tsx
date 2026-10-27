@@ -54,6 +54,8 @@ import { ScheduleQueueView } from './components/ScheduleQueueView';
 import { PlayerRosterView } from './components/PlayerRosterView';
 import { MatchupMatrixView } from './components/MatchupMatrixView';
 import { ScoreboardView } from './components/ScoreboardView';
+import { PWAInstallButton } from './components/PWAInstallButton';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import {
   auth,
   DEFAULT_SESSION_ID,
@@ -67,21 +69,68 @@ import {
 
 type ActiveTab = 'courts' | 'scores' | 'schedule' | 'roster' | 'matrix';
 
+const OFFLINE_STORAGE_KEY = 'pickle_smash_dxb_offline_v1';
+
+interface OfflineStoredSession {
+  players: Player[];
+  courtCount: number;
+  menCourtsPhase1: number;
+  genderGamesTarget: number;
+  mixedGamesTarget: number;
+  rounds: Round[];
+  activeRoundNumber: number;
+}
+
+function loadOfflineSession(): OfflineStoredSession | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(OFFLINE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      Array.isArray(parsed.players) &&
+      Array.isArray(parsed.rounds) &&
+      parsed.rounds.length > 0
+    ) {
+      return parsed as OfflineStoredSession;
+    }
+  } catch {
+    // Ignore storage read errors
+  }
+  return null;
+}
+
 export default function App() {
-  const [players, setPlayers] = useState<Player[]>(() =>
-    createInitialRoster(25, 20)
+  const initialOffline = useMemo(() => loadOfflineSession(), []);
+
+  const [players, setPlayers] = useState<Player[]>(
+    () => initialOffline?.players ?? createInitialRoster(25, 20)
   );
-  const [courtCount, setCourtCount] = useState<number>(4);
-  const [menCourtsPhase1, setMenCourtsPhase1] = useState<number>(2);
-  const [genderGamesTarget, setGenderGamesTarget] = useState<number>(4);
-  const [mixedGamesTarget, setMixedGamesTarget] = useState<number>(1);
+  const [courtCount, setCourtCount] = useState<number>(
+    () => initialOffline?.courtCount ?? 4
+  );
+  const [menCourtsPhase1, setMenCourtsPhase1] = useState<number>(
+    () => initialOffline?.menCourtsPhase1 ?? 2
+  );
+  const [genderGamesTarget, setGenderGamesTarget] = useState<number>(
+    () => initialOffline?.genderGamesTarget ?? 4
+  );
+  const [mixedGamesTarget, setMixedGamesTarget] = useState<number>(
+    () => initialOffline?.mixedGamesTarget ?? 1
+  );
 
   const [rounds, setRounds] = useState<Round[]>(() => {
+    if (initialOffline?.rounds && initialOffline.rounds.length > 0) {
+      return initialOffline.rounds;
+    }
     const initialPlayers = createInitialRoster(25, 20);
     return generateTwoPhaseSchedule(initialPlayers, 4, 1, 4, 2);
   });
 
-  const [activeRoundNumber, setActiveRoundNumber] = useState<number>(1);
+  const [activeRoundNumber, setActiveRoundNumber] = useState<number>(
+    () => initialOffline?.activeRoundNumber ?? 1
+  );
   const [activeTab, setActiveTab] = useState<ActiveTab>('courts');
   const [selectedSwapPlayerId, setSelectedSwapPlayerId] = useState<string | null>(
     null
@@ -129,6 +178,32 @@ export default function App() {
   const isApplyingRemoteUpdateRef = useRef<boolean>(false);
   const hasLoadedInitialRemoteRef = useRef<boolean>(false);
   const lastSyncedSignatureRef = useRef<string>('');
+
+  // Persist session to localStorage so it works 100% offline across reloads
+  useEffect(() => {
+    try {
+      const payload: OfflineStoredSession = {
+        players,
+        courtCount,
+        menCourtsPhase1,
+        genderGamesTarget,
+        mixedGamesTarget,
+        rounds,
+        activeRoundNumber,
+      };
+      window.localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore quota or storage errors
+    }
+  }, [
+    players,
+    courtCount,
+    menCourtsPhase1,
+    genderGamesTarget,
+    mixedGamesTarget,
+    rounds,
+    activeRoundNumber,
+  ]);
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
@@ -1477,8 +1552,9 @@ export default function App() {
             </button>
           </nav>
 
-          {/* Zone 3: Cloud Sync + Primary Action */}
+          {/* Zone 3: Cloud Sync + PWA Install + Primary Action */}
           <div className="flex items-center gap-2.5 shrink-0">
+            <PWAInstallButton />
             {currentUser ? (
               <div className="flex items-center gap-1.5 bg-[#F5F6F3] border border-[#E6EAE4] px-2.5 py-1.5 rounded-xl">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111312] whitespace-nowrap">
@@ -3045,6 +3121,7 @@ export default function App() {
           />
         )}
       </main>
+      <OfflineIndicator />
     </div>
   );
 }
